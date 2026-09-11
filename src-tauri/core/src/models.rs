@@ -1,0 +1,361 @@
+//! Модели данных, совместимые с data/time_tracker_v2_data.json
+//! (Python-версия). Загрузка «ленивая» — неверные записи пропускаются
+//! точно так же, как в оригинале.
+
+use chrono::NaiveDateTime;
+use serde::{Deserialize, Serialize};
+use serde_json::Value as J;
+
+use crate::dt::{fmt_dt, now_naive, parse_dt};
+
+// ---------------------------------------------------------------------
+// Settings
+// ---------------------------------------------------------------------
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Settings {
+    pub username: String,
+    pub grouping: String, // "none" | "day" | "client"
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Settings {
+            username: String::new(),
+            grouping: "none".into(),
+        }
+    }
+}
+
+impl Settings {
+    pub fn from_json(v: &J) -> Settings {
+        let obj = v.as_object();
+        let grouping = obj
+            .and_then(|o| o.get("grouping"))
+            .and_then(|x| x.as_str())
+            .unwrap_or("none")
+            .to_string();
+        Settings {
+            username: obj
+                .and_then(|o| o.get("username"))
+                .and_then(|x| x.as_str())
+                .unwrap_or("")
+                .to_string(),
+            grouping,
+        }
+    }
+
+    pub fn to_json(&self) -> J {
+        serde_json::json!({ "username": self.username, "grouping": self.grouping })
+    }
+}
+
+// ---------------------------------------------------------------------
+// Entity (тег / клиент)
+// ---------------------------------------------------------------------
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Entity {
+    pub id: u64,
+    pub name: String,
+}
+
+impl Entity {
+    pub fn from_json(v: &J) -> Option<Entity> {
+        let obj = v.as_object()?;
+        let name = obj.get("name")?.as_str()?.trim();
+        if name.is_empty() {
+            return None;
+        }
+        let id = obj.get("id").and_then(|x| x.as_u64()).unwrap_or(0);
+        Some(Entity {
+            id,
+            name: name.to_string(),
+        })
+    }
+}
+
+// ---------------------------------------------------------------------
+// Task / Interval / Status
+// ---------------------------------------------------------------------
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TaskStatus {
+    Running,
+    Paused,
+    Completed,
+}
+
+impl TaskStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            TaskStatus::Running => "running",
+            TaskStatus::Paused => "paused",
+            TaskStatus::Completed => "completed",
+        }
+    }
+
+    pub fn from_str(s: &str) -> TaskStatus {
+        match s {
+            "running" => TaskStatus::Running,
+            "paused" => TaskStatus::Paused,
+            _ => TaskStatus::Completed,
+        }
+    }
+}
+
+impl Serialize for TaskStatus {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_str(self.as_str())
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Interval {
+    pub start: NaiveDateTime,
+    pub stop: Option<NaiveDateTime>,
+}
+
+fn parse_seg(v: &J) -> Option<Interval> {
+    let obj = v.as_object()?;
+    let start = obj.get("start").and_then(|x| x.as_str()).and_then(parse_dt)?;
+    let stop = obj
+        .get("stop")
+        .and_then(|x| x.as_str())
+        .and_then(parse_dt);
+    Some(Interval { start, stop })
+}
+
+#[derive(Clone, Debug)]
+pub struct Task {
+    pub task_id: String,
+    pub user: String,
+    pub order: String,
+    pub tag: String,
+    pub client: String,
+    pub status: TaskStatus,
+    pub comment: String,
+    pub intervals: Vec<Interval>,
+}
+
+fn str_at(obj: &serde_json::Map<String, J>, key: &str) -> String {
+    obj.get(key)
+        .and_then(|x| x.as_str())
+        .unwrap_or("")
+        .to_string()
+}
+
+impl Task {
+    pub fn from_json(v: &J, load_now: NaiveDateTime) -> Option<Task> {
+        let obj = v.as_object()?;
+        let mut intervals: Vec<Interval> = Vec::new();
+        if let Some(arr) = obj.get("intervals").and_then(|x| x.as_array()) {
+            for seg in arr {
+                if let Some(iv) = parse_seg(seg) {
+                    intervals.push(iv);
+                }
+            }
+        }
+        if intervals.is_empty() {
+            // Поведение Python: если диапазоны не разобрались — берём
+            // верхнеуровневые start/end, иначе даже рукотворный now/now.
+            let st = str_at(obj, "start");
+            let st = parse_dt(&st).unwrap_or(load_now);
+            let sp = parse_dt(&str_at(obj, "end")).unwrap_or(st);
+            intervals.push(Interval {
+                start: st,
+                stop: Some(sp),
+            });
+        }
+        Some(Task {
+            task_id: str_at(obj, "task_id"),
+            user: str_at(obj, "user"),
+            order: str_at(obj, "order"),
+            tag: str_at(obj, "tag"),
+            client: str_at(obj, "client"),
+            status: TaskStatus::from_str(&str_at(obj, "status")),
+            comment: str_at(obj, "comment"),
+            intervals,
+        })
+    }
+
+    pub fn start_date(&self) -> NaiveDateTime {
+        self.intervals[0].start
+    }
+
+    pub fn end(&self) -> Option<NaiveDateTime> {
+        self.intervals.last().and_then(|i| i.stop)
+    }
+
+    pub fn is_open(&self) -> bool {
+        self.intervals.last().map(|i| i.stop.is_none()).unwrap_or(false)
+    }
+
+    pub fn start_str(&self) -> String {
+        fmt_dt(self.start_date())
+    }
+
+    pub fn end_str(&self) -> String {
+        self.end().map(fmt_dt).unwrap_or_default()
+    }
+
+    /// Строка всех диапазонов «дд.мм.гггг ЧЧ:ММ — … | …» (как Python).
+    pub fn ranges_str(&self) -> String {
+        let mut parts = Vec::new();
+        for seg in &self.intervals {
+            parts.push(match seg.stop {
+                Some(stop) => format!("{} — {}", fmt_dt(seg.start), fmt_dt(stop)),
+                None => format!("{} — открыт", fmt_dt(seg.start)),
+            });
+        }
+        parts.join(" | ")
+    }
+
+    /// Суммарное время в секундах, включая открытый интервал (как Python).
+    pub fn total_seconds(&self, now: NaiveDateTime) -> f64 {
+        let mut total = 0.0_f64;
+        for seg in &self.intervals {
+            if let Some(stop) = seg.stop {
+                total += (stop - seg.start).num_seconds() as f64;
+            }
+        }
+        if let Some(last) = self.intervals.last() {
+            if last.stop.is_none() {
+                total += (now - last.start).num_seconds().max(0) as f64;
+            }
+        }
+        total.max(0.0)
+    }
+
+    /// Включить (старт/возобновление): открывает новый интервал.
+    pub fn start(&mut self, at: NaiveDateTime) {
+        self.intervals.push(Interval {
+            start: at,
+            stop: None,
+        });
+        self.status = TaskStatus::Running;
+    }
+
+    /// Пауза: закрывает открытый интервал.
+    pub fn pause(&mut self, at: NaiveDateTime) {
+        if let Some(last) = self.intervals.last_mut() {
+            if last.stop.is_none() {
+                last.stop = Some(at);
+            }
+        }
+        self.status = TaskStatus::Paused;
+    }
+
+    /// Завершить: закрывает открытый интервал.
+    pub fn complete(&mut self, at: NaiveDateTime) {
+        if let Some(last) = self.intervals.last_mut() {
+            if last.stop.is_none() {
+                last.stop = Some(at);
+            }
+        }
+        self.status = TaskStatus::Completed;
+    }
+
+    /// Сериализация в формат файла (поля и порядок как в Python).
+    pub fn to_json(&self, now: NaiveDateTime) -> J {
+        let intervals: Vec<J> = self
+            .intervals
+            .iter()
+            .map(|i| {
+                serde_json::json!({
+                    "start": fmt_dt(i.start),
+                    "stop": i.stop.map(fmt_dt),
+                })
+            })
+            .collect();
+        serde_json::json!({
+            "task_id": self.task_id,
+            "user": self.user,
+            "order": self.order,
+            "tag": self.tag,
+            "client": self.client,
+            "status": self.status.as_str(),
+            "comment": self.comment,
+            "seconds": self.total_seconds(now),
+            "intervals": intervals,
+            "start": fmt_dt(self.start_date()),
+            "end": self.end().map(fmt_dt),
+        })
+    }
+}
+
+// ---------------------------------------------------------------------
+// Представление задачи для фронтенда
+// ---------------------------------------------------------------------
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppTask {
+    pub task_id: String,
+    pub user: String,
+    pub order: String,
+    pub tag: String,
+    pub client: String,
+    pub comment: String,
+    pub status: String,
+    pub seconds: f64,
+    pub time_label: String,
+    pub start_label: String,
+    pub end_label: Option<String>,
+    pub intervals_count: usize,
+}
+
+impl AppTask {
+    pub fn from_task(t: &Task, now: NaiveDateTime) -> AppTask {
+        AppTask {
+            task_id: t.task_id.clone(),
+            user: t.user.clone(),
+            order: t.order.clone(),
+            tag: t.tag.clone(),
+            client: t.client.clone(),
+            comment: t.comment.clone(),
+            status: t.status.as_str().to_string(),
+            seconds: t.total_seconds(now),
+            time_label: crate::dt::fmt_td(t.total_seconds(now)),
+            start_label: fmt_dt(t.start_date()),
+            end_label: t.end().map(fmt_dt),
+            intervals_count: t.intervals.len(),
+        }
+    }
+}
+
+/// Полный срез состояния для интерфейса.
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppState {
+    pub settings: Settings,
+    pub users: Vec<String>,
+    pub tags: Vec<Entity>,
+    pub clients: Vec<Entity>,
+    pub tasks: Vec<AppTask>,
+}
+
+// Типы, удобные для команд: создание и правка задачи.
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskDraft {
+    pub user: String,
+    pub order: String,
+    pub tag: String,
+    pub client: String,
+    pub comment: String,
+}
+
+impl TaskDraft {
+    pub fn apply(&self, t: &mut Task) {
+        t.user = self.user.trim().to_string();
+        t.order = self.order.trim().to_string();
+        t.tag = self.tag.trim().to_string();
+        t.client = self.client.trim().to_string();
+        t.comment = self.comment.trim().to_string();
+    }
+}
+
+pub fn load_now() -> NaiveDateTime {
+    now_naive()
+}

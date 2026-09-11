@@ -1,0 +1,14 @@
+node_modules/
+dist/
+target/
+src-tauri/gen/schemas/
+.env
+.vite/
+*.log
+.DS_Store
+.idea/
+
+# локальные данные/бэкапы (не коммитить)
+data/
+backups/
+reports/
