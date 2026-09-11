@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from "vue";
 import * as store from "../store";
+import SvgIcon from "../icons/SvgIcon.vue";
 
 const props = defineProps({
   rows: { type: Array, default: () => [] },
@@ -108,7 +109,7 @@ function onDeleteOne(task) {
             </td>
             <td>
               <span class="status-badge" :class="'status-' + row.status">
-                {{ row.status === "running" ? "▶" : row.status === "paused" ? "⏸" : "■" }}
+                <SvgIcon :name="row.status === 'running' ? 'pause' : row.status === 'paused' ? 'play' : 'stop'" />
               </span>
             </td>
             <td class="mono">{{ row.taskId }}</td>
@@ -125,18 +126,18 @@ function onDeleteOne(task) {
             <td>
               <div class="cell-actions">
                 <template v-if="row.status === 'running'">
-                  <button class="small" @click.stop="onPause(row)">⏸</button>
-                  <button class="small" @click.stop="onComplete(row)">■</button>
+                  <button class="small with-icon" @click.stop="onPause(row)"><SvgIcon name="pause" /></button>
+                  <button class="small with-icon" @click.stop="onComplete(row)"><SvgIcon name="stop" /></button>
                 </template>
                 <template v-else-if="row.status === 'paused'">
-                  <button class="small" @click.stop="onStart(row)">▶</button>
-                  <button class="small" @click.stop="onComplete(row)">■</button>
+                  <button class="small with-icon" @click.stop="onStart(row)"><SvgIcon name="play" /></button>
+                  <button class="small with-icon" @click.stop="onComplete(row)"><SvgIcon name="stop" /></button>
                 </template>
                 <template v-else>
-                  <button class="small" @click.stop="onStart(row)">▶</button>
+                  <button class="small with-icon" @click.stop="onStart(row)"><SvgIcon name="play" /></button>
                 </template>
-                <button class="small" @click.stop="$emit('edit', row)">✎</button>
-                <button class="small danger" @click.stop="onDeleteOne(row)">🗑</button>
+                <button class="small with-icon" @click.stop="$emit('edit', row)"><SvgIcon name="edit" /></button>
+                <button class="small danger with-icon" @click.stop="onDeleteOne(row)"><SvgIcon name="trash" /></button>
               </div>
             </td>
           </tr>

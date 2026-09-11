@@ -3,6 +3,7 @@ import { ref, reactive, onMounted, onBeforeUnmount } from "vue";
 import { save, open } from "@tauri-apps/plugin-dialog";
 import { api } from "../api";
 import { refresh as refreshState, refreshQuery } from "../store";
+import SvgIcon from "../icons/SvgIcon.vue";
 
 const emit = defineEmits(["close"]);
 
@@ -97,8 +98,8 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
   <div class="overlay" @click.self="emit('close')">
     <div class="modal modal-suit">
       <div class="modal-head">
-        <span>⇅ Экспорт / Импорт</span>
-        <button class="icon" @click="emit('close')">✕</button>
+        <span class="with-icon"><SvgIcon name="export" />Экспорт / Импорт</span>
+        <button class="icon" @click="emit('close')"><SvgIcon name="close" /></button>
       </div>
       <div class="modal-body">
         <div class="tabs">
@@ -120,7 +121,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
             <label><input type="checkbox" v-model="exportOpts.clients" /> Клиенты</label>
             <label><input type="checkbox" v-model="exportOpts.users" /> Пользователи</label>
           </div>
-          <button class="primary" :disabled="busy" @click="doExport">💾 Экспорт…</button>
+          <button class="primary with-icon" :disabled="busy" @click="doExport"><SvgIcon name="export" />Экспорт…</button>
         </template>
 
         <template v-else>
@@ -138,11 +139,11 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
             <label><input type="checkbox" v-model="importOpts.users" /> Пользователи</label>
           </div>
           <button
-            class="primary"
+            class="primary with-icon"
             :disabled="busy || !importOpts.path"
             @click="doImport"
           >
-            ⇪ Импортировать…
+            <SvgIcon name="import" />Импортировать…
           </button>
         </template>
       </div>

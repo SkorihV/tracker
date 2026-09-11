@@ -59,6 +59,13 @@ body {
   margin-left: auto;
 }
 
+.search-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+
 .main {
   flex: 1;
   display: flex;
@@ -141,6 +148,12 @@ button.danger:hover {
 button.icon {
   padding: 3px 8px;
   font-size: 12px;
+}
+
+.with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .table-wrap {

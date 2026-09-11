@@ -1,6 +1,7 @@
 <script setup>
 import { reactive, computed } from "vue";
 import { state } from "../store";
+import SvgIcon from "../icons/SvgIcon.vue";
 
 const props = defineProps({
   draft: { type: Object, required: true },
@@ -32,12 +33,12 @@ function submit() {
     <div class="modal" role="dialog" aria-modal="true">
       <div class="modal-head">
         <span>{{ title }}</span>
-        <button class="icon" @click="emit('close')">✕</button>
+        <button class="icon" @click="emit('close')"><SvgIcon name="close" /></button>
       </div>
       <div class="modal-body">
         <div class="form-grid2">
           <div class="form-row">
-            <label>Пользователь</label>
+            <label class="with-icon"><SvgIcon name="user" />Пользователь</label>
             <select v-model="form.user">
               <option v-for="u in state.users" :key="u" :value="u">{{ u }}</option>
             </select>
@@ -54,7 +55,7 @@ function submit() {
             </select>
           </div>
           <div class="form-row">
-            <label>Клиент</label>
+            <label class="with-icon"><SvgIcon name="client" />Клиент</label>
             <select v-model="form.client">
               <option value=""></option>
               <option v-for="c in state.clients" :key="c.id" :value="c.name">{{ c.name }}</option>

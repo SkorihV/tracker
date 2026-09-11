@@ -2,6 +2,7 @@
 import { ref, onMounted, onBeforeUnmount, watch, computed } from "vue";
 import { api } from "../api";
 import { state as appState } from "../store";
+import SvgIcon from "../icons/SvgIcon.vue";
 
 const emit = defineEmits(["close"]);
 
@@ -88,8 +89,8 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
   <div class="overlay" @click.self="emit('close')">
     <div class="modal modal-suit">
       <div class="modal-head">
-        <span>📊 Статистика</span>
-        <button class="icon" @click="emit('close')">✕</button>
+        <span class="with-icon"><SvgIcon name="chart" />Статистика</span>
+        <button class="icon" @click="emit('close')"><SvgIcon name="close" /></button>
       </div>
       <div class="modal-body">
         <div class="form-grid2">
@@ -145,8 +146,8 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
       </div>
       <div class="modal-foot">
         <button @click="emit('close')">Закрыть</button>
-        <button class="primary" :disabled="loading" @click="saveStats">
-          💾 Экспорт ({{ format.toUpperCase() }})
+        <button class="primary with-icon" :disabled="loading" @click="saveStats">
+          <SvgIcon name="export" />Экспорт ({{ format.toUpperCase() }})
         </button>
       </div>
     </div>

@@ -1,5 +1,6 @@
 <script setup>
 import { ref } from "vue";
+import SvgIcon from "../icons/SvgIcon.vue";
 
 const props = defineProps({
   kind: { type: String, required: true },
@@ -65,15 +66,15 @@ function remove(item) {
             @keydown.enter="saveEdit(keyOf(item), nameOf(item))"
             @keydown.esc="cancelEdit"
           />
-          <button class="small" @click="saveEdit(keyOf(item), nameOf(item))">✓</button>
-          <button class="small" @click="cancelEdit">✕</button>
+          <button class="small" @click="saveEdit(keyOf(item), nameOf(item))"><SvgIcon name="check" /></button>
+          <button class="small" @click="cancelEdit"><SvgIcon name="close" /></button>
         </template>
         <template v-else>
           <span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis">
             {{ nameOf(item) }}
           </span>
-          <button class="small" @click="startEdit(keyOf(item), nameOf(item))">✎</button>
-          <button class="small danger" @click="remove(item)">🗑</button>
+          <button class="small with-icon" @click="startEdit(keyOf(item), nameOf(item))"><SvgIcon name="edit" /></button>
+          <button class="small danger with-icon" @click="remove(item)"><SvgIcon name="trash" /></button>
         </template>
       </div>
     </div>

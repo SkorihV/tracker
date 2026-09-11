@@ -8,6 +8,7 @@ import SettingsModal from "./components/SettingsModal.vue";
 import ReportModal from "./components/ReportModal.vue";
 import StatsModal from "./components/StatsModal.vue";
 import ImportExportModal from "./components/ImportExportModal.vue";
+import SvgIcon from "./icons/SvgIcon.vue";
 
 const editing = ref(null);
 const showSettings = ref(false);
@@ -118,9 +119,9 @@ onBeforeUnmount(() => {
 <template>
   <div class="app">
     <div class="topbar">
-      <h1>⏱ Time Tracker</h1>
-      <button class="primary" @click="newTask">＋ Новая задача</button>
-      <button @click="showSettings = true">⚙ Настройки</button>
+      <h1 class="with-icon"><SvgIcon name="timer" />Time Tracker</h1>
+      <button class="primary with-icon" @click="newTask"><SvgIcon name="plus" />Новая задача</button>
+      <button class="with-icon" @click="showSettings = true"><SvgIcon name="cog" />Настройки</button>
 
       <div class="search-box">
         <label>
@@ -131,14 +132,17 @@ onBeforeUnmount(() => {
             <option value="client">По клиентам</option>
           </select>
         </label>
-        <input
-          ref="searchRef"
-          v-model="store.state.filter.search"
-          placeholder="🔍 Поиск (ID, заявка, комментарий…)"
-          style="width: 280px"
-          class="input"
-          @keydown.enter="store.refreshQuery()"
-        />
+        <div class="search-field">
+          <SvgIcon name="search" />
+          <input
+            ref="searchRef"
+            v-model="store.state.filter.search"
+            placeholder="Поиск (ID, заявка, комментарий…)"
+            style="width: 280px"
+            class="input"
+            @keydown.enter="store.refreshQuery()"
+          />
+        </div>
         <button class="small" @click="store.refreshQuery()">Найти</button>
       </div>
     </div>
@@ -160,12 +164,12 @@ onBeforeUnmount(() => {
         <div class="tags">
           <span>Задачи: <b>{{ store.state.totals.count }}</b></span>
           <span>Время: <b>{{ store.state.totals.timeLabel }}</b></span>
-          <button @click="showReport = true">📄 Отчёт</button>
-          <button @click="showStats = true">📊 Статистика</button>
-          <button @click="showImportExport = true">⇅ Экспорт/Импорт</button>
+          <button class="with-icon" @click="showReport = true"><SvgIcon name="clock" />Отчёт</button>
+          <button class="with-icon" @click="showStats = true"><SvgIcon name="chart" />Статистика</button>
+          <button class="with-icon" @click="showImportExport = true"><SvgIcon name="export" />Экспорт/Импорт</button>
         </div>
-        <button v-if="selectedIds.size" class="danger" @click="onDeleteTasks(Array.from(selectedIds))">
-          🗑 Удалить выбранное ({{ selectedIds.size }})
+        <button v-if="selectedIds.size" class="danger with-icon" @click="onDeleteTasks(Array.from(selectedIds))">
+          <SvgIcon name="trash" />Удалить выбранное ({{ selectedIds.size }})
         </button>
       </div>
     </div>

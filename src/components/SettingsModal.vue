@@ -2,6 +2,7 @@
 import { ref, onMounted, onBeforeUnmount } from "vue";
 import { state, saveEntity, applySettings } from "../store";
 import EntityPanel from "./EntityPanel.vue";
+import SvgIcon from "../icons/SvgIcon.vue";
 
 const emit = defineEmits(["close"]);
 
@@ -27,8 +28,8 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
   <div class="overlay" @click.self="emit('close')">
     <div class="modal" style="min-width: 820px">
       <div class="modal-head">
-        <span>⚙ Настройки</span>
-        <button class="icon" @click="emit('close')">✕</button>
+        <span class="with-icon"><SvgIcon name="cog" />Настройки</span>
+        <button class="icon" @click="emit('close')"><SvgIcon name="close" /></button>
       </div>
       <div class="modal-body">
         <div class="form-row" style="max-width: 320px">
