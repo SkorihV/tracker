@@ -76,6 +76,34 @@ impl Entity {
 }
 
 // ---------------------------------------------------------------------
+// StatusDef (пользовательский статус задачи: имя + цвет ячейки)
+// ---------------------------------------------------------------------
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct StatusDef {
+    pub id: u64,
+    pub name: String,
+    pub color: String,
+}
+
+impl StatusDef {
+    pub fn from_json(v: &J) -> Option<StatusDef> {
+        let obj = v.as_object()?;
+        let name = obj.get("name")?.as_str()?.trim();
+        if name.is_empty() {
+            return None;
+        }
+        let id = obj.get("id").and_then(|x| x.as_u64()).unwrap_or(0);
+        let color = obj.get("color").and_then(|x| x.as_str()).unwrap_or("default").to_string();
+        Some(StatusDef {
+            id,
+            name: name.to_string(),
+            color,
+        })
+    }
+}
+
+// ---------------------------------------------------------------------
 // Task / Interval / Status
 // ---------------------------------------------------------------------
 
@@ -131,9 +159,10 @@ pub struct Task {
     pub task_id: String,
     pub user: String,
     pub order: String,
-    pub tag: String,
+    pub tags: Vec<String>,
     pub client: String,
     pub status: TaskStatus,
+    pub custom_status: String,
     pub comment: String,
     pub intervals: Vec<Interval>,
 }
@@ -143,6 +172,28 @@ fn str_at(obj: &serde_json::Map<String, J>, key: &str) -> String {
         .and_then(|x| x.as_str())
         .unwrap_or("")
         .to_string()
+}
+
+fn tags_from_json(obj: &serde_json::Map<String, J>) -> Vec<String> {
+    if let Some(arr) = obj.get("tags").and_then(|x| x.as_array()) {
+        let mut v: Vec<String> = arr
+            .iter()
+            .filter_map(|x| x.as_str())
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        v.dedup();
+        if !v.is_empty() {
+            return v;
+        }
+    }
+    // Совместимость со старым форматом: одно поле «tag» (строка).
+    let old = str_at(obj, "tag");
+    if old.is_empty() {
+        Vec::new()
+    } else {
+        vec![old]
+    }
 }
 
 impl Task {
@@ -171,9 +222,10 @@ impl Task {
             task_id: str_at(obj, "task_id"),
             user: str_at(obj, "user"),
             order: str_at(obj, "order"),
-            tag: str_at(obj, "tag"),
+            tags: tags_from_json(obj),
             client: str_at(obj, "client"),
             status: TaskStatus::from_str(&str_at(obj, "status")),
+            custom_status: str_at(obj, "custom_status"),
             comment: str_at(obj, "comment"),
             intervals,
         })
@@ -256,6 +308,19 @@ impl Task {
         self.status = TaskStatus::Completed;
     }
 
+    /// Перезаписать даты ПОСЛЕДНЕГО диапазона (поля «Начало/Завершение» редактора).
+    pub fn set_last_interval(&mut self, start: NaiveDateTime, stop: Option<NaiveDateTime>) {
+        if let Some(last) = self.intervals.last_mut() {
+            last.start = start;
+            last.stop = stop;
+        }
+        self.status = match stop {
+            None => TaskStatus::Running,
+            Some(_) if self.status == TaskStatus::Running => TaskStatus::Paused,
+            Some(_) => self.status.clone(),
+        };
+    }
+
     /// Сериализация в формат файла (поля и порядок как в Python).
     pub fn to_json(&self, now: NaiveDateTime) -> J {
         let intervals: Vec<J> = self
@@ -272,9 +337,11 @@ impl Task {
             "task_id": self.task_id,
             "user": self.user,
             "order": self.order,
-            "tag": self.tag,
+            "tags": self.tags,
+            "tag": self.tags.first().cloned().unwrap_or_default(),
             "client": self.client,
             "status": self.status.as_str(),
+            "custom_status": self.custom_status,
             "comment": self.comment,
             "seconds": self.total_seconds(now),
             "intervals": intervals,
@@ -294,15 +361,24 @@ pub struct AppTask {
     pub task_id: String,
     pub user: String,
     pub order: String,
-    pub tag: String,
+    pub tags: Vec<String>,
     pub client: String,
     pub comment: String,
     pub status: String,
+    pub custom_status: String,
     pub seconds: f64,
     pub time_label: String,
     pub start_label: String,
     pub end_label: Option<String>,
     pub intervals_count: usize,
+    pub ranges: Vec<AppInterval>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppInterval {
+    pub start: String,
+    pub stop: Option<String>,
 }
 
 impl AppTask {
@@ -311,15 +387,24 @@ impl AppTask {
             task_id: t.task_id.clone(),
             user: t.user.clone(),
             order: t.order.clone(),
-            tag: t.tag.clone(),
+            tags: t.tags.clone(),
             client: t.client.clone(),
             comment: t.comment.clone(),
             status: t.status.as_str().to_string(),
+            custom_status: t.custom_status.clone(),
             seconds: t.total_seconds(now),
             time_label: crate::dt::fmt_td(t.total_seconds(now)),
             start_label: fmt_dt(t.start_date()),
             end_label: t.end().map(fmt_dt),
             intervals_count: t.intervals.len(),
+            ranges: t
+                .intervals
+                .iter()
+                .map(|i| AppInterval {
+                    start: fmt_dt(i.start),
+                    stop: i.stop.map(fmt_dt),
+                })
+                .collect(),
         }
     }
 }
@@ -332,6 +417,7 @@ pub struct AppState {
     pub users: Vec<String>,
     pub tags: Vec<Entity>,
     pub clients: Vec<Entity>,
+    pub statuses: Vec<StatusDef>,
     pub tasks: Vec<AppTask>,
 }
 
@@ -341,18 +427,27 @@ pub struct AppState {
 pub struct TaskDraft {
     pub user: String,
     pub order: String,
-    pub tag: String,
+    pub tags: Vec<String>,
     pub client: String,
     pub comment: String,
+    pub custom_status: String,
 }
 
 impl TaskDraft {
     pub fn apply(&self, t: &mut Task) {
         t.user = self.user.trim().to_string();
         t.order = self.order.trim().to_string();
-        t.tag = self.tag.trim().to_string();
+        let mut tags: Vec<String> = self
+            .tags
+            .iter()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        tags.dedup();
+        t.tags = tags;
         t.client = self.client.trim().to_string();
         t.comment = self.comment.trim().to_string();
+        t.custom_status = self.custom_status.trim().to_string();
     }
 }
 

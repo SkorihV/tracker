@@ -9,15 +9,21 @@ async function call(cmd, args) {
   }
 }
 
+function cleanFilter(f) {
+  const out = {};
+  for (const [k, v] of Object.entries(f)) out[k] = v ?? "";
+  return out;
+}
+
 export const api = {
   getState: () => call("get_state"),
-  query: (filter) => call("query", { filter }),
-  reportPreview: (filter) => call("report_preview", { filter }),
+  query: (filter) => call("query", { filter: cleanFilter(filter) }),
+  reportPreview: (filter) => call("report_preview", { filter: cleanFilter(filter) }),
   createReport: (format, filter, dateFrom, dateTo) =>
-    call("create_report", { format, filter, dateFrom, dateTo }),
-  statsPreview: (filter) => call("stats_preview", { filter }),
+    call("create_report", { format, filter: cleanFilter(filter), dateFrom, dateTo }),
+  statsPreview: (filter) => call("stats_preview", { filter: cleanFilter(filter) }),
   createStats: (format, filter, dateFrom, dateTo) =>
-    call("create_stats", { format, filter, dateFrom, dateTo }),
+    call("create_stats", { format, filter: cleanFilter(filter), dateFrom, dateTo }),
   exportJson: (path, opts) =>
     call("export_json", {
       path,
@@ -36,6 +42,9 @@ export const api = {
     }),
   createTask: (d) => call("create_task", d),
   updateTask: (d) => call("update_task", d),
+  setTaskStatus: (taskId, status) => call("set_task_status", { taskId, status }),
+  setTaskDates: (taskId, start, end) => call("set_task_dates", { taskId, start, end }),
+  setTaskIntervals: (taskId, lines) => call("set_task_intervals", { taskId, lines }),
   startTask: (taskId) => call("start_task", { taskId }),
   pauseTask: (taskId) => call("pause_task", { taskId }),
   resumeTask: (taskId) => call("resume_task", { taskId }),
@@ -54,6 +63,11 @@ export const api = {
   addClient: (name) => call("add_client", { name }),
   removeClient: (id) => call("remove_client", { id }),
   renameClient: (old, newName) => call("rename_client", { old, new: newName }),
+
+  addStatus: (name, color) => call("add_status", { name, color }),
+  removeStatus: (id) => call("remove_status", { id }),
+  renameStatus: (old, newName) => call("rename_status", { old, new: newName }),
+  setStatusColor: (id, color) => call("set_status_color", { id, color }),
 };
 
 export function fmtTd(seconds) {

@@ -102,17 +102,34 @@ fn import_json(
 }
 
 #[tauri::command]
-fn create_task(s: State<'_, AppStore>, user: String, order: String, tag: String, client: String, comment: String) -> Result<(), String> {
+fn create_task(s: State<'_, AppStore>, user: String, order: String, tags: Vec<String>, client: String, comment: String, custom_status: String) -> Result<tracker_core::models::AppTask, String> {
     let mut st = s.0.lock().map_err(|e| e.to_string())?;
-    st.create_task(TaskDraft { user, order, tag, client, comment });
+    Ok(st.create_task(TaskDraft { user, order, tags, client, comment, custom_status }))
+}
+
+#[tauri::command]
+fn update_task(s: State<'_, AppStore>, task_id: String, user: String, order: String, tags: Vec<String>, client: String, comment: String, custom_status: String) -> Result<(), String> {
+    let mut st = s.0.lock().map_err(|e| e.to_string())?;
+    st.update_task(&task_id, TaskDraft { user, order, tags, client, comment, custom_status });
     Ok(())
 }
 
 #[tauri::command]
-fn update_task(s: State<'_, AppStore>, task_id: String, user: String, order: String, tag: String, client: String, comment: String) -> Result<(), String> {
-    let mut st = s.0.lock().map_err(|e| e.to_string())?;
-    st.update_task(&task_id, TaskDraft { user, order, tag, client, comment });
+fn set_task_status(s: State<'_, AppStore>, task_id: String, status: String) -> Result<(), String> {
+    s.0.lock().map_err(|e| e.to_string())?.set_task_status(&task_id, status);
     Ok(())
+}
+
+#[tauri::command]
+fn set_task_dates(s: State<'_, AppStore>, task_id: String, start: String, end: String) -> Result<(), String> {
+    let mut st = s.0.lock().map_err(|e| e.to_string())?;
+    st.set_task_dates(&task_id, start, end)
+}
+
+#[tauri::command]
+fn set_task_intervals(s: State<'_, AppStore>, task_id: String, lines: Vec<String>) -> Result<(), String> {
+    let mut st = s.0.lock().map_err(|e| e.to_string())?;
+    st.set_task_intervals(&task_id, lines)
 }
 
 #[tauri::command]
@@ -208,6 +225,32 @@ fn rename_client(s: State<'_, AppStore>, old: String, new: String) -> Result<(),
     Ok(())
 }
 
+// ---------- Статусы задачи (справочник) ----------
+
+#[tauri::command]
+fn add_status(s: State<'_, AppStore>, name: String, color: String) -> Result<(), String> {
+    s.0.lock().map_err(|e| e.to_string())?.add_status(&name, &color);
+    Ok(())
+}
+
+#[tauri::command]
+fn remove_status(s: State<'_, AppStore>, id: u64) -> Result<(), String> {
+    s.0.lock().map_err(|e| e.to_string())?.remove_status(id);
+    Ok(())
+}
+
+#[tauri::command]
+fn rename_status(s: State<'_, AppStore>, old: String, new: String) -> Result<(), String> {
+    s.0.lock().map_err(|e| e.to_string())?.rename_status(&old, &new);
+    Ok(())
+}
+
+#[tauri::command]
+fn set_status_color(s: State<'_, AppStore>, id: u64, color: String) -> Result<(), String> {
+    s.0.lock().map_err(|e| e.to_string())?.set_status_color(id, color);
+    Ok(())
+}
+
 pub fn run() {
     let base = base_dir();
     let data = tracker_core::store::data_file(base.clone());
@@ -250,6 +293,9 @@ pub fn run() {
             import_json,
             create_task,
             update_task,
+            set_task_status,
+            set_task_dates,
+            set_task_intervals,
             start_task,
             pause_task,
             resume_task,
@@ -264,7 +310,11 @@ pub fn run() {
             rename_tag,
             add_client,
             remove_client,
-            rename_client
+            rename_client,
+            add_status,
+            remove_status,
+            rename_status,
+            set_status_color
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

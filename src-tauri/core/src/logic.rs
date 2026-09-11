@@ -64,7 +64,7 @@ impl TaskIdGen {
 pub struct TaskFilter {
     pub date_from: String,
     pub date_to: String,
-    pub tag: String,
+    pub tags: Vec<String>,
     pub client: String,
     pub user: String,
     pub search: String,
@@ -74,6 +74,12 @@ pub fn apply_filter(tasks: &[Task], f: &TaskFilter, now: NaiveDateTime) -> Vec<A
     let from = parse_date(&f.date_from);
     let to = parse_date(&f.date_to);
     let q = f.search.trim().to_lowercase();
+    let want_tags: Vec<String> = f
+        .tags
+        .iter()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
 
     let mut out: Vec<&Task> = Vec::new();
     for t in tasks {
@@ -87,8 +93,12 @@ pub fn apply_filter(tasks: &[Task], f: &TaskFilter, now: NaiveDateTime) -> Vec<A
                 continue;
             }
         }
-        if !f.tag.trim().is_empty() && t.tag != f.tag.trim() {
-            continue;
+        if !want_tags.is_empty() {
+            // Задача проходит, если выбраны некоторые/все её теги.
+            let hit = t.tags.iter().any(|tag| want_tags.iter().any(|w| tag == w));
+            if !hit {
+                continue;
+            }
         }
         if !f.client.trim().is_empty() && t.client != f.client.trim() {
             continue;
@@ -97,7 +107,8 @@ pub fn apply_filter(tasks: &[Task], f: &TaskFilter, now: NaiveDateTime) -> Vec<A
             continue;
         }
         if !q.is_empty() {
-            let hay = [&t.task_id, &t.order, &t.tag, &t.client, &t.user, &t.comment];
+            let tags_text = t.tags.join(" ");
+            let hay = [&t.task_id, &t.order, &tags_text, &t.client, &t.user, &t.comment];
             if !hay.iter().any(|s| s.to_lowercase().contains(&q)) {
                 continue;
             }
@@ -133,12 +144,16 @@ pub fn build_totals(tasks: &[AppTask]) -> Totals {
     let total: f64 = tasks.iter().map(|t| t.seconds).sum();
     let mut map: HashMap<String, f64> = HashMap::new();
     for t in tasks {
-        let k = if t.tag.is_empty() {
-            "(без тега)"
+        if t.tags.is_empty() {
+            *map.entry("(без тега)".to_string()).or_insert(0.0) += t.seconds;
         } else {
-            t.tag.as_str()
-        };
-        *map.entry(k.to_string()).or_insert(0.0) += t.seconds;
+            for tag in &t.tags {
+                if tag.trim().is_empty() {
+                    continue;
+                }
+                *map.entry(tag.trim().to_string()).or_insert(0.0) += t.seconds;
+            }
+        }
     }
     let mut by_tag: Vec<TotalLine> = map
         .into_iter()

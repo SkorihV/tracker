@@ -1,15 +1,15 @@
 <script setup>
-import { onMounted, onBeforeUnmount, reactive, ref, nextTick } from "vue";
-import * as store from "./store";
-import FilterBar from "./components/FilterBar.vue";
-import TaskTable from "./components/TaskTable.vue";
+import { ref, onMounted, onBeforeUnmount } from "vue";
+import { useAppStore } from "./store";
+import FilterBar from "./components/filter/FilterBar.vue";
+import TaskTable from "./components/task/TaskTable.vue";
 import TaskFormModal from "./components/TaskFormModal.vue";
-import SettingsModal from "./components/SettingsModal.vue";
+import SettingsModal from "./components/settings/SettingsModal.vue";
 import ReportModal from "./components/ReportModal.vue";
 import StatsModal from "./components/StatsModal.vue";
 import ImportExportModal from "./components/ImportExportModal.vue";
-import SvgIcon from "./icons/SvgIcon.vue";
 
+const store = useAppStore();
 const editing = ref(null);
 const showSettings = ref(false);
 const showReport = ref(false);
@@ -24,21 +24,23 @@ function onSelectionChange(set) {
 
 function focusSearch() {
   searchRef.value?.focus();
-  searchRef.value?.select();
+  const el = searchRef.value?.$el?.querySelector?.("input");
+  if (el) el.select();
 }
 
 async function newTask() {
-  if (!store.state.settings.username) {
+  if (!store.settings.username) {
     showSettings.value = true;
     return;
   }
   editing.value = {
     mode: "new",
-    user: store.state.settings.username,
+    user: store.settings.username,
     order: "",
-    tag: "",
+    tags: [],
     client: "",
     comment: "",
+    customStatus: "",
   };
 }
 
@@ -48,20 +50,40 @@ function editTask(task) {
     taskId: task.taskId,
     user: task.user,
     order: task.order,
-    tag: task.tag,
+    tags: task.tags || [],
     client: task.client,
     comment: task.comment,
+    customStatus: task.customStatus || "",
+    start: task.startLabel || "",
+    end: task.endLabel || "",
+    intervalsCount: task.intervalsCount || 1,
+    ranges: task.ranges || [],
   };
 }
 
 async function onSaveTask(draft) {
+  const fields = {
+    user: draft.user,
+    order: draft.order,
+    tags: draft.tags || [],
+    client: draft.client,
+    comment: draft.comment,
+    customStatus: draft.customStatus || "",
+  };
+  let id = draft.taskId;
   if (draft.mode === "new") {
-    await store.addTask(draft);
+    const created = await store.addTask(fields);
+    id = created.taskId;
   } else {
-    await store.updateTask(draft.taskId, draft);
+    await store.updateTask(id, fields);
+  }
+  if (draft._datesDirty) {
+    await store.updateTaskDates(id, draft.start || "", draft.end || "");
+  }
+  if (draft._rangesDirty && draft._rangesLines?.length) {
+    await store.updateTaskIntervals(id, draft._rangesLines);
   }
   editing.value = null;
-  await nextTick(() => {});
 }
 
 async function onDeleteTasks(ids) {
@@ -74,16 +96,16 @@ async function onDeleteTasks(ids) {
   }
 }
 
-function onGroupingChange(e) {
-  store.applySettings(store.state.settings.username, e.target.value);
+function onGroupingChange(value) {
+  store.applySettings(store.settings.username, value);
 }
 
 function onKeydown(e) {
   const tag = (e.target.tagName || "").toLowerCase();
   const typing = tag === "input" || tag === "textarea" || tag === "select";
   if (typing) {
-    if (e.key === "Escape" && tag === "input" && e.target === searchRef.value) {
-      store.state.filter.search = "";
+    if (e.key === "Escape" && tag === "input" && e.target === searchRef.value?.$el?.querySelector?.("input")) {
+      store.filter.search = "";
       store.refreshQuery();
     }
     return;
@@ -117,67 +139,97 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="app">
-    <div class="topbar">
-      <h1 class="with-icon"><SvgIcon name="timer" />Time Tracker</h1>
-      <button class="primary with-icon" @click="newTask"><SvgIcon name="plus" />Новая задача</button>
-      <button class="with-icon" @click="showSettings = true"><SvgIcon name="cog" />Настройки</button>
+  <v-app>
+    <v-container fluid class="border-b py-0 px-4 d-flex justify-center align-center ga-4">
+      <template #prepend>
 
-      <div class="search-box">
-        <label>
-          Группировка:
-          <select :value="store.state.settings.grouping" @change="onGroupingChange">
-            <option value="none">Нет</option>
-            <option value="day">По дням</option>
-            <option value="client">По клиентам</option>
-          </select>
-        </label>
-        <div class="search-field">
-          <SvgIcon name="search" />
-          <input
-            ref="searchRef"
-            v-model="store.state.filter.search"
-            placeholder="Поиск (ID, заявка, комментарий…)"
-            style="width: 280px"
-            class="input"
-            @keydown.enter="store.refreshQuery()"
-          />
-        </div>
-        <button class="small" @click="store.refreshQuery()">Найти</button>
-      </div>
-    </div>
+      </template>
+      <v-sheet min-width="150px"><v-btn icon="systemIcons:iconTimer" variant="text" aria-label="Time Tracker" />Time Tracker</v-sheet>
 
-    <div v-if="store.state.error" class="banner-error">{{ store.state.error }}</div>
 
-    <div class="main">
+
+      <v-autocomplete
+        :model-value="store.settings.grouping"
+        :items="[
+          { title: 'Нет', value: 'none' },
+          { title: 'По дням', value: 'day' },
+          { title: 'По клиентам', value: 'client' },
+        ]"
+        label="Группировка"
+        variant="solo"
+        density="compact"
+        hide-details
+        min-width="150px"
+        @update:model-value="onGroupingChange"
+      />
+
+      <v-text-field
+        ref="searchRef"
+        v-model="store.filter.search"
+        placeholder="Поиск (ID, заявка, комментарий…)"
+        variant="solo"
+        density="compact"
+        hide-details
+        clearable
+        min-width="150px"
+        prepend-inner-icon="systemIcons:iconSearch"
+        @keydown.enter="store.refreshQuery()"
+        @click:clear="store.refreshQuery()"
+      />
+      <v-btn variant="tonal" height="90%" density="compact" @click="store.refreshQuery()">Найти</v-btn>
+      <v-spacer />
+      <v-btn color="primary" height="90%" variant="flat" density="compact" prepend-icon="systemIcons:iconPlus" @click="newTask">
+        Новая задача
+      </v-btn>
+      <v-btn variant="tonal" height="90%" density="compact" prepend-icon="systemIcons:iconCog" @click="showSettings = true">
+        Настройки
+      </v-btn>
+    </v-container>
+
+    <v-main class="pa-4 d-flex flex-column">
+      <v-alert v-if="store.error" type="error" density="compact" class="mb-3" closable @click:close="store.error = ''">
+        {{ store.error }}
+      </v-alert>
+
       <FilterBar />
 
       <TaskTable
-        :rows="store.state.rows"
+        class="flex-grow-1"
+        :rows="store.rows"
         :selected-ids="selectedIds"
         @selection-change="onSelectionChange"
         @edit="editTask"
         @delete="onDeleteTasks"
       />
 
-      <div class="footer">
-        <div class="tags">
-          <span>Задачи: <b>{{ store.state.totals.count }}</b></span>
-          <span>Время: <b>{{ store.state.totals.timeLabel }}</b></span>
-          <button class="with-icon" @click="showReport = true"><SvgIcon name="clock" />Отчёт</button>
-          <button class="with-icon" @click="showStats = true"><SvgIcon name="chart" />Статистика</button>
-          <button class="with-icon" @click="showImportExport = true"><SvgIcon name="export" />Экспорт/Импорт</button>
+      <div class="d-flex align-center justify-space-between flex-wrap ga-4 pt-3">
+        <div class="d-flex align-center ga-3">
+          <span class="text-body-2 text-medium-emphasis">
+            Задачи: <b>{{ store.totals.count }}</b>
+          </span>
+          <span class="text-body-2 text-medium-emphasis">
+            Общее время: <b class="mono">{{ store.totals.timeLabel }}</b>
+          </span>
+          <v-btn variant="tonal" size="small" prepend-icon="systemIcons:iconClock" @click="showReport = true">Отчёт</v-btn>
+          <v-btn variant="tonal" size="small" prepend-icon="systemIcons:iconChart" @click="showStats = true">Статистика</v-btn>
+          <v-btn variant="tonal" size="small" prepend-icon="systemIcons:iconExport" @click="showImportExport = true">Экспорт/Импорт</v-btn>
         </div>
-        <button v-if="selectedIds.size" class="danger with-icon" @click="onDeleteTasks(Array.from(selectedIds))">
-          <SvgIcon name="trash" />Удалить выбранное ({{ selectedIds.size }})
-        </button>
+        <v-btn
+          v-if="selectedIds.size"
+          color="error"
+          variant="tonal"
+          prepend-icon="systemIcons:iconTrash"
+          @click="onDeleteTasks(Array.from(selectedIds))"
+        >
+          Удалить выбранное ({{ selectedIds.size }})
+        </v-btn>
       </div>
-    </div>
+    </v-main>
 
     <TaskFormModal v-if="editing" :draft="editing" @save="onSaveTask" @close="editing = null" />
     <SettingsModal v-if="showSettings" @close="showSettings = false" />
     <ReportModal v-if="showReport" @close="showReport = false" />
     <StatsModal v-if="showStats" @close="showStats = false" />
     <ImportExportModal v-if="showImportExport" @close="showImportExport = false" />
-  </div>
+  </v-app>
 </template>

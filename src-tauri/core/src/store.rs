@@ -4,9 +4,9 @@
 use std::fs;
 use std::path::PathBuf;
 
-use crate::dt::now_naive;
+use crate::dt::{now_naive, parse_dt};
 use crate::logic::{build_rows, build_totals, apply_filter, TaskFilter, TaskIdGen, Totals, ViewRow};
-use crate::models::{AppState, AppTask, Entity, Settings, Task, TaskDraft};
+use crate::models::{AppState, AppTask, Entity, Interval, Settings, StatusDef, Task, TaskDraft, TaskStatus};
 
 #[derive(Debug)]
 pub struct Store {
@@ -15,9 +15,11 @@ pub struct Store {
     pub users: Vec<String>,
     pub tags: Vec<Entity>,
     pub clients: Vec<Entity>,
+    pub statuses: Vec<StatusDef>,
     pub tasks: Vec<Task>,
     pub next_tag_id: u64,
     pub next_client_id: u64,
+    pub next_status_id: u64,
     id_gen: TaskIdGen,
 }
 
@@ -31,9 +33,11 @@ impl Store {
             users: Vec::new(),
             tags: Vec::new(),
             clients: Vec::new(),
+            statuses: Vec::new(),
             tasks: Vec::new(),
             next_tag_id: 1,
             next_client_id: 1,
+            next_status_id: 1,
             id_gen: TaskIdGen::new(),
         };
         st.load();
@@ -79,6 +83,9 @@ impl Store {
         if let Some(arr) = val.get("clients").and_then(|x| x.as_array()) {
             self.clients = arr.iter().filter_map(Entity::from_json).collect();
         }
+        if let Some(arr) = val.get("statuses").and_then(|x| x.as_array()) {
+            self.statuses = arr.iter().filter_map(StatusDef::from_json).collect();
+        }
         let load_now = now_naive();
         if let Some(arr) = val.get("tasks").and_then(|x| x.as_array()) {
             self.tasks = arr
@@ -92,6 +99,10 @@ impl Store {
             .unwrap_or(1);
         self.next_client_id = val
             .get("_next_client_id")
+            .and_then(|x| x.as_u64())
+            .unwrap_or(1);
+        self.next_status_id = val
+            .get("_next_status_id")
             .and_then(|x| x.as_u64())
             .unwrap_or(1);
 
@@ -127,9 +138,11 @@ impl Store {
             "users": self.users,
             "tags": self.tags,
             "clients": self.clients,
+            "statuses": self.statuses,
             "tasks": self.tasks.iter().map(|t| t.to_json(now)).collect::<Vec<_>>(),
             "_next_tag_id": self.next_tag_id,
             "_next_client_id": self.next_client_id,
+            "_next_status_id": self.next_status_id,
         });
         if let Ok(pretty) = serde_json::to_string_pretty(&obj) {
             let _ = fs::write(&self.path, pretty);
@@ -147,6 +160,7 @@ impl Store {
             users: self.users.clone(),
             tags: self.tags.clone(),
             clients: self.clients.clone(),
+            statuses: self.statuses.clone(),
             tasks: self.tasks.iter().map(|t| AppTask::from_task(t, now)).collect(),
         }
     }
@@ -165,20 +179,26 @@ impl Store {
 
     pub fn create_task(&mut self, draft: TaskDraft) -> AppTask {
         let now = now_naive();
-        let task = Task {
+        let mut task = Task {
             task_id: self.id_gen.next_id(),
-            user: draft.user.trim().to_string(),
-            order: draft.order.trim().to_string(),
-            tag: draft.tag.trim().to_string(),
-            client: draft.client.trim().to_string(),
+            user: String::new(),
+            order: String::new(),
+            tags: Vec::new(),
+            client: String::new(),
             status: crate::models::TaskStatus::Running,
-            comment: draft.comment.trim().to_string(),
+            custom_status: String::new(),
+            comment: String::new(),
             intervals: vec![crate::models::Interval {
                 start: now,
                 stop: None,
             }],
         };
+        draft.apply(&mut task);
         self.ensure_user(&task.user);
+        for tag in task.tags.clone() {
+            self.ensure_tag(&tag);
+        }
+        self.ensure_status(&task.custom_status);
         let view = AppTask::from_task(&task, now_naive());
         self.tasks.push(task);
         self.save();
@@ -190,7 +210,114 @@ impl Store {
             draft.apply(t);
         }
         self.ensure_user(&draft.user);
+        for tag in draft.tags.clone() {
+            let tag = tag.trim().to_string();
+            if !tag.is_empty() {
+                self.ensure_tag(&tag);
+            }
+        }
+        self.ensure_status(&draft.custom_status.trim());
         self.save();
+    }
+
+    /// Сменить пользовательский статус задачи (каскадно в справочник, если
+    /// статус ещё не существует).
+    pub fn set_task_status(&mut self, task_id: &str, status: String) {
+        let status = status.trim().to_string();
+        self.ensure_status(&status);
+        if let Some(t) = self.tasks.iter_mut().find(|t| t.task_id == task_id) {
+            t.custom_status = status;
+        }
+        self.save();
+    }
+
+    /// Обновить даты ПОСЛЕДНЕГО диапазона (поля «Начало/Завершение» редактора).
+    pub fn set_task_dates(&mut self, task_id: &str, start: String, end: String) -> Result<(), String> {
+        let start_dt = parse_dt(&start)
+            .ok_or_else(|| format!("Неверный формат начала (дд.мм.гггг чч:мм)"))?;
+        let end_dt = if end.trim().is_empty() {
+            None
+        } else {
+            Some(parse_dt(&end).ok_or_else(|| format!("Неверный формат завершения (дд.мм.гггг чч:мм)"))?)
+        };
+        if let Some(e) = end_dt {
+            if e < start_dt {
+                return Err("Завершение раньше начала".to_string());
+            }
+        }
+        if let Some(t) = self.tasks.iter_mut().find(|t| t.task_id == task_id) {
+            t.set_last_interval(start_dt, end_dt);
+        }
+        self.save();
+        Ok(())
+    }
+
+    /// Заменить все диапазоны задачи строками «дд.мм.гггг чч:мм — …»
+    /// (завершение может отсутствовать = открытый диапазон).
+    pub fn set_task_intervals(&mut self, task_id: &str, lines: Vec<String>) -> Result<(), String> {
+        let non_empty: Vec<&str> = lines
+            .iter()
+            .map(|l| l.trim())
+            .filter(|l| !l.is_empty())
+            .collect();
+        if non_empty.is_empty() {
+            return Err("Должен быть хотя бы один диапазон".to_string());
+        }
+        let mut intervals: Vec<Interval> = Vec::new();
+        for line in non_empty {
+            let iv = Self::parse_interval_line(line)?;
+            if let Some(prev) = intervals.last().and_then(|i| i.stop) {
+                if iv.start < prev {
+                    return Err("Диапазоны должны идти по порядку времени".to_string());
+                }
+            }
+            intervals.push(iv);
+        }
+        if let Some(open_idx) = intervals.iter().position(|i| i.stop.is_none()) {
+            if open_idx != intervals.len() - 1 {
+                return Err("Открытым может быть только последний диапазон".to_string());
+            }
+        }
+        if let Some(t) = self.tasks.iter_mut().find(|t| t.task_id == task_id) {
+            let open = intervals.last().map(|i| i.stop.is_none()).unwrap_or(false);
+            t.intervals = intervals;
+            t.status = if open {
+                TaskStatus::Running
+            } else if t.status == TaskStatus::Running {
+                TaskStatus::Paused
+            } else {
+                t.status.clone()
+            };
+        }
+        self.save();
+        Ok(())
+    }
+
+    /// Строка «дд.мм.гггг чч:мм [»— …»]»; завершение может отсутствовать,
+    /// быть «открыт», датой/временем.
+    fn parse_interval_line(line: &str) -> Result<Interval, String> {
+        let line = line
+            .replace("—", "\u{0}")
+            .replace("–", "\u{0}")
+            .replace('-', "\u{0}");
+        let mut parts = line.split('\u{0}');
+        let start_text = parts.next().unwrap_or("").trim();
+        let end_text = parts.next().unwrap_or("").trim();
+        let start = parse_dt(start_text)
+            .ok_or_else(|| format!("Неверный формат начала: «{}»", start_text))?;
+        let stop = if end_text.is_empty() || end_text.eq_ignore_ascii_case("открыт") {
+            None
+        } else {
+            let dt = parse_dt(end_text).or_else(|| {
+                chrono::NaiveTime::parse_from_str(end_text, "%H:%M")
+                    .ok()
+                    .map(|t| start.date().and_time(t))
+            });
+            Some(
+                dt.ok_or_else(|| format!("Неверный формат завершения: «{}»", end_text))?,
+            )
+        };
+        Ok(Interval { start, stop })
     }
 
     pub fn start_task(&mut self, task_id: &str) {
@@ -282,6 +409,19 @@ impl Store {
     // Теги / клиенты
     // -----------------------------------------------------------------
 
+    fn ensure_tag(&mut self, name: &str) {
+        let name = name.trim();
+        if name.is_empty() || self.tags.iter().any(|e| e.name == name) {
+            return;
+        }
+        self.tags.push(Entity {
+            id: self.next_tag_id,
+            name: name.to_string(),
+        });
+        self.next_tag_id += 1;
+        self.save();
+    }
+
     pub fn add_tag(&mut self, name: &str) {
         let name = name.trim();
         if name.is_empty() || self.tags.iter().any(|e| e.name == name) {
@@ -304,8 +444,10 @@ impl Store {
             tag.name = new.to_string();
         }
         for t in self.tasks.iter_mut() {
-            if t.tag == old {
-                t.tag = new.to_string();
+            for tag in t.tags.iter_mut() {
+                if tag == old {
+                    *tag = new.to_string();
+                }
             }
         }
         self.save();
@@ -315,6 +457,84 @@ impl Store {
         self.tags.retain(|e| e.id != id);
         self.save();
     }
+
+    // -----------------------------------------------------------------
+    // Статусы задачи (справочник «Статус»)
+    // -----------------------------------------------------------------
+
+    /// Добавить статус в справочник, если ещё нет; сохраняет файл.
+    pub fn ensure_status(&mut self, name: &str) {
+        let name = name.trim();
+        if name.is_empty() || self.statuses.iter().any(|s| s.name == name) {
+            return;
+        }
+        self.statuses.push(StatusDef {
+            id: self.next_status_id,
+            name: name.to_string(),
+            color: "default".to_string(),
+        });
+        self.next_status_id += 1;
+        self.save();
+    }
+
+    pub fn add_status(&mut self, name: &str, color: &str) {
+        let name = name.trim();
+        if name.is_empty() || self.statuses.iter().any(|s| s.name == name) {
+            return;
+        }
+        self.statuses.push(StatusDef {
+            id: self.next_status_id,
+            name: name.to_string(),
+            color: color.trim().to_string(),
+        });
+        self.next_status_id += 1;
+        self.save();
+    }
+
+    pub fn remove_status(&mut self, id: u64) {
+        let removed_names: Vec<String> = self
+            .statuses
+            .iter()
+            .filter(|s| s.id == id)
+            .map(|s| s.name.clone())
+            .collect();
+        self.statuses.retain(|s| s.id != id);
+        if !removed_names.is_empty() {
+            for t in self.tasks.iter_mut() {
+                if removed_names.contains(&t.custom_status) {
+                    t.custom_status.clear();
+                }
+            }
+        }
+        self.save();
+    }
+
+    pub fn rename_status(&mut self, old: &str, new: &str) {
+        let new = new.trim();
+        if new.is_empty() {
+            return;
+        }
+        if let Some(st) = self.statuses.iter_mut().find(|s| s.name == old) {
+            st.name = new.to_string();
+        }
+        for t in self.tasks.iter_mut() {
+            if t.custom_status == old {
+                t.custom_status = new.to_string();
+            }
+        }
+        self.save();
+    }
+
+    pub fn set_status_color(&mut self, id: u64, color: String) {
+        if let Some(st) = self.statuses.iter_mut().find(|s| s.id == id) {
+            st.color = color.trim().to_string();
+            self.save();
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // Клиенты
+    // -----------------------------------------------------------------
 
     pub fn add_client(&mut self, name: &str) {
         let name = name.trim();

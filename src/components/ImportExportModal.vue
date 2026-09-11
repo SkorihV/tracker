@@ -1,10 +1,10 @@
 <script setup>
-import { ref, reactive, onMounted, onBeforeUnmount } from "vue";
+import { ref, reactive, computed } from "vue";
 import { save, open } from "@tauri-apps/plugin-dialog";
 import { api } from "../api";
-import { refresh as refreshState, refreshQuery } from "../store";
-import SvgIcon from "../icons/SvgIcon.vue";
+import { useAppStore } from "../store";
 
+const store = useAppStore();
 const emit = defineEmits(["close"]);
 
 const tab = ref("export");
@@ -76,8 +76,8 @@ async function doImport() {
       clients: importOpts.clients,
       users: importOpts.users,
     });
-    await refreshState();
-    await refreshQuery();
+    await store.refresh();
+    await store.refreshQuery();
     notice.value = `Импортировано из: ${importOpts.path}`;
   } catch (e) {
     error.value = String(e);
@@ -86,70 +86,78 @@ async function doImport() {
   }
 }
 
-function onKeydown(e) {
-  if (e.key === "Escape") emit("close");
-}
-
-onMounted(() => window.addEventListener("keydown", onKeydown));
-onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
+const dialogOpen = computed({
+  get: () => true,
+  set: () => emit("close"),
+});
 </script>
 
 <template>
-  <div class="overlay" @click.self="emit('close')">
-    <div class="modal modal-suit">
-      <div class="modal-head">
-        <span class="with-icon"><SvgIcon name="export" />Экспорт / Импорт</span>
-        <button class="icon" @click="emit('close')"><SvgIcon name="close" /></button>
-      </div>
-      <div class="modal-body">
-        <div class="tabs">
-          <button :class="{ active: tab === 'export' }" @click="tab = 'export'">Экспорт</button>
-          <button :class="{ active: tab === 'import' }" @click="tab = 'import'">Импорт</button>
-        </div>
+  <v-dialog v-model="dialogOpen" max-width="560" max-height="85vh">
+    <v-card class="modal-card">
+      <v-toolbar density="compact" color="primary">
+        <v-toolbar-title>Экспорт / Импорт</v-toolbar-title>
+      </v-toolbar>
 
-        <div v-if="error" class="banner-error">{{ error }}</div>
-        <div v-if="notice" class="banner-ok">{{ notice }}</div>
+      <v-card-text class="pt-5">
+        <v-tabs v-model="tab" color="primary" class="mb-4">
+          <v-tab value="export">Экспорт</v-tab>
+          <v-tab value="import">Импорт</v-tab>
+        </v-tabs>
+
+        <v-alert v-if="error" type="error" density="compact" variant="tonal" class="mb-3">{{ error }}</v-alert>
+        <v-alert v-if="notice" type="success" density="compact" variant="tonal" class="mb-3">{{ notice }}</v-alert>
 
         <template v-if="tab === 'export'">
-          <div class="form-row">
-            <label>Файл (по умолчанию)</label>
-            <input v-model="exportOpts.filename" />
-          </div>
-          <div class="check-list">
-            <label><input type="checkbox" v-model="exportOpts.tasks" /> Задачи</label>
-            <label><input type="checkbox" v-model="exportOpts.tags" /> Теги</label>
-            <label><input type="checkbox" v-model="exportOpts.clients" /> Клиенты</label>
-            <label><input type="checkbox" v-model="exportOpts.users" /> Пользователи</label>
-          </div>
-          <button class="primary with-icon" :disabled="busy" @click="doExport"><SvgIcon name="export" />Экспорт…</button>
+          <v-text-field
+            v-model="exportOpts.filename"
+            label="Файл (по умолчанию)"
+            density="compact"
+            variant="outlined"
+            class="mb-3"
+          />
+          <v-checkbox v-model="exportOpts.tasks" label="Задачи" density="compact" hide-details />
+          <v-checkbox v-model="exportOpts.tags" label="Теги" density="compact" hide-details />
+          <v-checkbox v-model="exportOpts.clients" label="Клиенты" density="compact" hide-details />
+          <v-checkbox v-model="exportOpts.users" label="Пользователи" density="compact" hide-details />
         </template>
 
         <template v-else>
-          <div class="form-row">
-            <label>Файл для импорта</label>
-            <div class="file-row">
-              <input :value="importOpts.path" placeholder="не выбран" readonly />
-              <button class="small" @click="pickFile">Выбрать…</button>
-            </div>
-          </div>
-          <div class="check-list">
-            <label><input type="checkbox" v-model="importOpts.tasks" /> Задачи</label>
-            <label><input type="checkbox" v-model="importOpts.tags" /> Теги</label>
-            <label><input type="checkbox" v-model="importOpts.clients" /> Клиенты</label>
-            <label><input type="checkbox" v-model="importOpts.users" /> Пользователи</label>
-          </div>
-          <button
-            class="primary with-icon"
-            :disabled="busy || !importOpts.path"
-            @click="doImport"
-          >
-            <SvgIcon name="import" />Импортировать…
-          </button>
+          <v-text-field
+            :model-value="importOpts.path"
+            label="Файл для импорта"
+            placeholder="не выбран"
+            density="compact"
+            variant="outlined"
+            readonly
+            class="mb-2"
+            :append-inner-icon="importOpts.path ? 'systemIcons:iconClose' : undefined"
+            @click:append-inner="importOpts.path = ''"
+          />
+          <v-btn variant="tonal" size="small" prepend-icon="systemIcons:iconImport" class="mb-3" @click="pickFile">
+            Выбрать…
+          </v-btn>
+          <v-checkbox v-model="importOpts.tasks" label="Задачи" density="compact" hide-details />
+          <v-checkbox v-model="importOpts.tags" label="Теги" density="compact" hide-details />
+          <v-checkbox v-model="importOpts.clients" label="Клиенты" density="compact" hide-details />
+          <v-checkbox v-model="importOpts.users" label="Пользователи" density="compact" hide-details />
         </template>
-      </div>
-      <div class="modal-foot">
-        <button @click="emit('close')">Закрыть</button>
-      </div>
-    </div>
-  </div>
+      </v-card-text>
+
+      <v-card-actions>
+        <v-spacer />
+        <v-btn variant="text" @click="emit('close')">Закрыть</v-btn>
+        <template v-if="tab === 'export'">
+          <v-btn color="primary" variant="flat" prepend-icon="systemIcons:iconExport" :disabled="busy" @click="doExport">
+            Экспорт…
+          </v-btn>
+        </template>
+        <template v-else>
+          <v-btn color="primary" variant="flat" prepend-icon="systemIcons:iconImport" :disabled="busy || !importOpts.path" @click="doImport">
+            Импортировать…
+          </v-btn>
+        </template>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>

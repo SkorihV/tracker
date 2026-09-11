@@ -7,6 +7,7 @@ use std::fs;
 use std::path::Path;
 
 use tracker_core::backups::{create_backups, migrate_old_backups};
+use tracker_core::dt::{fmt_dt, now_naive};
 use tracker_core::logic::{apply_filter, build_rows, build_totals, TaskFilter, TaskIdGen};
 use tracker_core::models::{TaskDraft, TaskStatus};
 use tracker_core::store::Store;
@@ -178,9 +179,10 @@ fn store_mutations() {
     let t = st.create_task(TaskDraft {
         user: "Тест 1".into(),
         order: "R-1".into(),
-        tag: "".into(),
+        tags: vec![],
         client: "".into(),
         comment: "сквозной тест на Rust".into(),
+        custom_status: "".into(),
     });
     assert_eq!(st.tasks.len(), before_n + 1);
     assert_eq!(t.status, "running");
@@ -196,11 +198,11 @@ fn store_mutations() {
 
     st.update_task(
         &t.task_id,
-        TaskDraft { user: "Второй".into(), order: "R-2".into(), tag: "Тонкий".into(), client: "Клиент 1".into(), comment: "".into() },
+        TaskDraft { user: "Второй".into(), order: "R-2".into(), tags: vec!["Тонкий".into()], client: "Клиент 1".into(), comment: "".into(), custom_status: "".into() },
     );
     let last = st.tasks.last().unwrap();
     assert_eq!(last.order, "R-2");
-    assert_eq!(last.tag, "Тонкий");
+    assert_eq!(last.tags, vec!["Тонкий"]);
     assert!(st.users.iter().any(|u| u == "Второй"), "пользователь добавляется автоматически");
 
     st.remove_task(&t.task_id);
@@ -210,4 +212,210 @@ fn store_mutations() {
     let st2 = Store::open(db.clone());
     assert_eq!(st2.users.iter().filter(|u| **u == "Второй").count(), 1);
     assert!(Path::new(&db).exists());
+}
+
+#[test]
+fn dates_and_intervals() {
+    let dir = temp_dir("dates");
+    let db = dir.join("data").join("time_tracker_v2_data.json");
+    let mut st = Store::open(db.clone());
+
+    let t = st.create_task(TaskDraft {
+        user: "Тест".into(),
+        order: "R-1".into(),
+        tags: vec![],
+        client: "".into(),
+        comment: "".into(),
+        custom_status: "".into(),
+    });
+
+    // Поля редактора «Начало / Завершение» меняют последний диапазон.
+    st.set_task_dates(&t.task_id, "01.01.2026 09:00".into(), "01.01.2026 10:30".into())
+        .expect("valid dates");
+    let task = st.tasks.iter().find(|x| x.task_id == t.task_id).unwrap();
+    assert_eq!(fmt_dt(task.start_date()), "01.01.2026 09:00");
+    assert_eq!(fmt_dt(task.end().unwrap()), "01.01.2026 10:30");
+    assert_eq!(task.status, TaskStatus::Paused, "закрытый диапазон из running → paused");
+
+    // Пустое завершение = открытый диапазон → running.
+    st.set_task_dates(&t.task_id, "01.01.2026 09:00".into(), "".into())
+        .expect("open interval");
+    let task = st.tasks.iter().find(|x| x.task_id == t.task_id).unwrap();
+    assert!(task.is_open());
+    assert_eq!(task.status, TaskStatus::Running);
+
+    // Ошибка формата.
+    assert!(st.set_task_dates(&t.task_id, "01-01-2026 09:00".into(), "".into()).is_err());
+    // Завершение раньше начала.
+    assert!(st.set_task_dates(&t.task_id, "01.01.2026 10:00".into(), "01.01.2026 09:00".into()).is_err());
+
+    // Замена всех диапазонов строками.
+    st.set_task_intervals(
+        &t.task_id,
+        vec![
+            "01.01.2026 08:00 — 01.01.2026 09:00".into(),
+            "01.01.2026 09:00 — 10:00".into(),
+            "01.01.2026 10:00".into(),
+        ],
+    )
+    .expect("valid intervals");
+    let task = st.tasks.iter().find(|x| x.task_id == t.task_id).unwrap();
+    assert_eq!(task.intervals.len(), 3);
+    assert_eq!(fmt_dt(task.intervals[1].stop.unwrap()), "01.01.2026 10:00");
+    assert!(task.is_open());
+    assert_eq!(task.status, TaskStatus::Running);
+
+    // Хотя бы один диапазон.
+    assert!(st.set_task_intervals(&t.task_id, vec![]).is_err());
+    // Неверный формат строки.
+    assert!(st.set_task_intervals(&t.task_id, vec!["не дата".into()]).is_err());
+    // Открытый диапазон не последний.
+    assert!(st.set_task_intervals(
+        &t.task_id,
+        vec!["01.01.2026 08:00".into(), "01.01.2026 09:00 — 10:00".into()]
+    )
+    .is_err());
+    // Нарушение порядка времени.
+    assert!(st.set_task_intervals(
+        &t.task_id,
+        vec![
+            "01.01.2026 09:00 — 10:00".into(),
+            "01.01.2026 08:00 — 08:30".into(),
+        ]
+    )
+    .is_err());
+
+    let t2 = st.create_task(TaskDraft {
+        user: "Тест".into(),
+        order: "R-2".into(),
+        tags: vec![],
+        client: "".into(),
+        comment: "".into(),
+        custom_status: "".into(),
+    });
+    st.set_task_intervals(
+        &t2.task_id,
+        vec!["01.01.2026 08:00 — 01.01.2026 09:00".into(), "02.01.2026 08:00 — 09:00".into()],
+    )
+    .expect("closed intervals");
+    let task = st.tasks.iter().find(|x| x.task_id == t2.task_id).unwrap();
+    assert!(!task.is_open());
+    assert_eq!(task.status, TaskStatus::Paused);
+    let view = tracker_core::models::AppTask::from_task(task, now_naive());
+    assert_eq!(view.intervals_count, 2);
+    assert_eq!(view.ranges.len(), 2);
+}
+
+#[test]
+fn tags_and_statuses() {
+    let dir = temp_dir("tags_statuses");
+    let db = dir.join("data").join("time_tracker_v2_data.json");
+    let mut st = Store::open(db.clone());
+
+    st.add_status("Новая", "blue");
+    st.add_status("В работе", "orange");
+    st.add_status("Новая", "green"); // дубль имени игнорируется
+    assert_eq!(st.statuses.len(), 2);
+    assert_eq!(st.statuses[0].color, "blue");
+
+    let t = st.create_task(TaskDraft {
+        user: "Тест".into(),
+        order: "R-1".into(),
+        tags: vec!["Альфа".into(), "Бета".into()],
+        client: "".into(),
+        comment: "".into(),
+        custom_status: "Новая".into(),
+    });
+    // Теги и статус автоматически добавлены в справочники.
+    assert!(st.tags.iter().any(|e| e.name == "Альфа"));
+    assert!(st.tags.iter().any(|e| e.name == "Бета"));
+
+    st.set_task_status(&t.task_id, "В работе".into());
+    let task = st.tasks.iter().find(|x| x.task_id == t.task_id).unwrap();
+    assert_eq!(task.custom_status, "В работе");
+    assert_eq!(task.tags, vec!["Альфа", "Бета"]);
+
+    // Переименование статуса каскадно обновляет задачи.
+    st.rename_status("В работе", "В прогрессе");
+    let task = st.tasks.iter().find(|x| x.task_id == t.task_id).unwrap();
+    assert_eq!(task.custom_status, "В прогрессе");
+
+    // Удаление статуса очищает его у задач.
+    let in_progress_id = st
+        .statuses
+        .iter()
+        .find(|s| s.name == "В прогрессе")
+        .unwrap()
+        .id;
+    st.remove_status(in_progress_id);
+    let task = st.tasks.iter().find(|x| x.task_id == t.task_id).unwrap();
+    assert_eq!(task.custom_status, "");
+
+    // Переименование тега каскадно.
+    st.rename_tag("Альфа", "Альфа2");
+    let task = st.tasks.iter().find(|x| x.task_id == t.task_id).unwrap();
+    assert_eq!(task.tags, vec!["Альфа2", "Бета"]);
+
+    // Мультитег в фильтре: задача проходит по «Бета», не проходит по «Гамма».
+    let f = tracker_core::logic::TaskFilter {
+        tags: vec!["Бета".into()],
+        ..Default::default()
+    };
+    let rows = st.query(&f);
+    assert_eq!(rows.0.len(), 1);
+    let f = tracker_core::logic::TaskFilter {
+        tags: vec!["Гамма".into()],
+        ..Default::default()
+    };
+    let rows = st.query(&f);
+    assert_eq!(rows.0.len(), 0);
+
+    // Итог по тегам: задача с двумя тегами попадает в обе строки.
+    let (_, totals) = st.query(&tracker_core::logic::TaskFilter::default());
+    assert_eq!(totals.by_tag.len(), 2);
+    for line in &totals.by_tag {
+        assert_ne!(line.name, "(без тега)");
+        assert!(line.name == "Альфа2" || line.name == "Бета");
+    }
+
+    // Формат файла: поле tag (строка) для совместимости + tags-массив.
+    st.save();
+    let raw = fs::read_to_string(&db).unwrap();
+    assert!(raw.contains("\"tags\""));
+    assert!(raw.contains("\"custom_status\""));
+    assert!(raw.contains("\"statuses\""));
+    st.remove_task(&t.task_id);
+
+    // Старый формат: задача с одним строковым тегом загружается в tags.
+    let db2 = dir.join("data").join("legacy.json");
+    fs::create_dir_all(db2.parent().unwrap()).unwrap();
+    fs::write(
+        &db2,
+        r#"{
+            "users": [],
+            "tags": [],
+            "clients": [],
+            "statuses": [],
+            "tasks": [
+                {
+                    "task_id": "L-1",
+                    "user": "Старый",
+                    "order": "R-9",
+                    "tag": "Наследие",
+                    "client": "",
+                    "status": "completed",
+                    "comment": "",
+                    "start": "01.01.2026 10:00",
+                    "end": "01.01.2026 11:00",
+                    "intervals": [
+                        {"start": "01.01.2026 10:00", "stop": "01.01.2026 11:00"}
+                    ]
+                }
+            ]
+        }"#,
+    )
+    .unwrap();
+    let st2 = Store::open(db2.clone());
+    let old = st2.tasks.iter().find(|x| x.task_id == "L-1").unwrap();
+    assert_eq!(old.tags, vec!["Наследие"]);
 }

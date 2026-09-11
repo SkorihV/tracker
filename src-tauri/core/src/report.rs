@@ -24,7 +24,7 @@ pub struct ReportRow {
     pub user: String,
     pub order: String,
     pub client: String,
-    pub tag: String,
+    pub tags: Vec<String>,
     pub elapsed_label: String,
     pub comment: String,
     pub ranges: String,
@@ -75,6 +75,12 @@ pub fn filtered_tasks<'a>(tasks: &'a [Task], f: &TaskFilter) -> Vec<&'a Task> {
     let from = parse_date(&f.date_from);
     let to = parse_date(&f.date_to);
     let q = f.search.trim().to_lowercase();
+    let want_tags: Vec<String> = f
+        .tags
+        .iter()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
     let mut out: Vec<&Task> = Vec::new();
     for t in tasks {
         if let Some(d) = from {
@@ -87,8 +93,11 @@ pub fn filtered_tasks<'a>(tasks: &'a [Task], f: &TaskFilter) -> Vec<&'a Task> {
                 continue;
             }
         }
-        if !f.tag.trim().is_empty() && t.tag != f.tag.trim() {
-            continue;
+        if !want_tags.is_empty() {
+            let hit = t.tags.iter().any(|tag| want_tags.iter().any(|w| tag == w));
+            if !hit {
+                continue;
+            }
         }
         if !f.client.trim().is_empty() && t.client != f.client.trim() {
             continue;
@@ -97,7 +106,8 @@ pub fn filtered_tasks<'a>(tasks: &'a [Task], f: &TaskFilter) -> Vec<&'a Task> {
             continue;
         }
         if !q.is_empty() {
-            let hay = [&t.task_id, &t.order, &t.tag, &t.client, &t.user, &t.comment];
+            let tags_text = t.tags.join(" ");
+            let hay = [&t.task_id, &t.order, &tags_text, &t.client, &t.user, &t.comment];
             if !hay.iter().any(|s| s.to_lowercase().contains(&q)) {
                 continue;
             }
@@ -113,6 +123,28 @@ where
     I: IntoIterator<Item = &'a Task>,
 {
     items.into_iter().map(|t| t.total_seconds(now)).sum()
+}
+
+/// Свод «тег → секунды»: задача без тегов попадает в «(без тега)»,
+/// многозначная — в каждую строку своего тега.
+fn tag_seconds<'a, I>(items: I, now: chrono::NaiveDateTime) -> HashMap<String, f64>
+where
+    I: IntoIterator<Item = &'a Task>,
+{
+    let mut map: HashMap<String, f64> = HashMap::new();
+    for t in items {
+        if t.tags.is_empty() {
+            *map.entry("(без тега)".to_string()).or_insert(0.0) += t.total_seconds(now);
+        } else {
+            for tag in &t.tags {
+                if tag.trim().is_empty() {
+                    continue;
+                }
+                *map.entry(tag.trim().to_string()).or_insert(0.0) += t.total_seconds(now);
+            }
+        }
+    }
+    map
 }
 
 /// Разбивка «Имя | Задач | Общее время | Среднее», сортировка по времени.
@@ -154,6 +186,43 @@ fn fmt_to_secs(label: &str) -> f64 {
     h * 3600.0 + m * 60.0 + s
 }
 
+/// Разбивка «по тегам» для статистики: многозначная задача входит во все
+/// свои теги. «(без тега)» — задач без тегов.
+fn tag_stats<'a>(list: &[&'a Task], now: chrono::NaiveDateTime) -> Vec<StatsLine> {
+    let mut map: HashMap<String, Vec<&'a Task>> = HashMap::new();
+    for t in list {
+        if t.tags.is_empty() {
+            map.entry("(без тега)".to_string()).or_default().push(t);
+        } else {
+            for tag in &t.tags {
+                if tag.trim().is_empty() {
+                    continue;
+                }
+                map.entry(tag.trim().to_string()).or_default().push(t);
+            }
+        }
+    }
+    let mut lines: Vec<StatsLine> = map
+        .into_iter()
+        .map(|(name, group)| {
+            let secs = total_seconds(group.iter().copied(), now);
+            let count = group.len();
+            StatsLine {
+                name,
+                count,
+                total_label: fmt_td(secs),
+                avg_label: fmt_td(if count > 0 { secs / count as f64 } else { 0.0 }),
+            }
+        })
+        .collect();
+    lines.sort_by(|a, b| {
+        fmt_to_secs(&b.total_label)
+            .partial_cmp(&fmt_to_secs(&a.total_label))
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    lines
+}
+
 // ---------------------------------------------------------------------
 // Report preview
 // ---------------------------------------------------------------------
@@ -171,23 +240,14 @@ pub fn report_preview(tasks: &[Task], f: &TaskFilter) -> ReportPreview {
             user: t.user.clone(),
             order: t.order.clone(),
             client: t.client.clone(),
-            tag: t.tag.clone(),
+            tags: t.tags.clone(),
             elapsed_label: fmt_td(t.total_seconds(now)),
             comment: t.comment.clone(),
             ranges: t.ranges_str(),
         })
         .collect();
 
-    let mut tag_map: HashMap<String, f64> = HashMap::new();
-    for t in &list {
-        let k = if t.tag.is_empty() {
-            "(без тега)"
-        } else {
-            t.tag.as_str()
-        };
-        *tag_map.entry(k.to_string()).or_insert(0.0) += t.total_seconds(now);
-    }
-    let mut by_tag: Vec<TotalLine> = tag_map
+    let mut by_tag: Vec<TotalLine> = tag_seconds(list.iter().copied(), now)
         .into_iter()
         .map(|(name, seconds)| TotalLine {
             name,
@@ -229,13 +289,7 @@ pub fn statistics(tasks: &[Task], f: &TaskFilter) -> Stats {
             t.client.clone()
         }
     }, now);
-    let by_tag = group_stats(&list, |t| {
-        if t.tag.is_empty() {
-            "(без тега)".to_string()
-        } else {
-            t.tag.clone()
-        }
-    }, now);
+    let by_tag = tag_stats(&list, now);
     let by_month = group_stats(&list, |t| t.start_date().format("%Y-%m").to_string(), now);
 
     Stats {
@@ -278,11 +332,7 @@ pub fn write_report(
         return Err("Нет записей за выбранный период".to_string());
     }
     let secs = total_seconds(list.iter().copied(), now);
-    let mut tag_map: HashMap<String, f64> = HashMap::new();
-    for t in &list {
-        let k = if t.tag.is_empty() { "(без тега)" } else { t.tag.as_str() };
-        *tag_map.entry(k.to_string()).or_insert(0.0) += t.total_seconds(now);
-    }
+    let tag_map = tag_seconds(list.iter().copied(), now);
 
     let dir = reports_dir(base);
     let ts = ts_stamp();
@@ -307,7 +357,7 @@ pub fn write_report(
                     t.user.clone(),
                     t.order.clone(),
                     t.client.clone(),
-                    t.tag.clone(),
+                    t.tags.join(", "),
                     fmt_td(t.total_seconds(now)),
                     t.comment.clone(),
                     t.ranges_str(),
@@ -422,7 +472,7 @@ fn report_txt(list: &[&Task], secs: f64, tag_map: &HashMap<String, f64>, date_fr
             t.end_str(),
             t.user,
             t.client,
-            t.tag,
+            t.tags.join(", "),
             fmt_td(t.total_seconds(now)),
             t.order,
             t.ranges_str(),
@@ -465,7 +515,7 @@ fn report_md(list: &[&Task], secs: f64, tag_map: &HashMap<String, f64>, date_fro
             t.end_str(),
             t.user,
             t.client,
-            t.tag,
+            t.tags.join(", "),
             fmt_td(t.total_seconds(now_naive())),
             t.order,
             comment,
@@ -547,7 +597,7 @@ fn write_report_xlsx(
             t.user.clone(),
             t.order.clone(),
             t.client.clone(),
-            t.tag.clone(),
+            t.tags.join(", "),
             fmt_td(t.total_seconds(now_naive())),
             t.comment.clone(),
             t.ranges_str(),

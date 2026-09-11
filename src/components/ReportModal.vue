@@ -1,15 +1,15 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch } from "vue";
+import { ref, watch, computed } from "vue";
 import { api } from "../api";
-import { state as appState } from "../store";
-import SvgIcon from "../icons/SvgIcon.vue";
+import { useAppStore } from "../store";
 
+const store = useAppStore();
 const emit = defineEmits(["close"]);
 
 const formats = ["txt", "md", "csv", "xlsx"];
 const format = ref("txt");
-const dateFrom = ref(appState.filter.dateFrom || "");
-const dateTo = ref(appState.filter.dateTo || "");
+const dateFrom = ref(store.filter.dateFrom || "");
+const dateTo = ref(store.filter.dateTo || "");
 
 const preview = ref(null);
 const loading = ref(false);
@@ -20,10 +20,10 @@ function toFilter() {
   return {
     dateFrom: dateFrom.value,
     dateTo: dateTo.value,
-    tag: appState.filter.tag,
-    client: appState.filter.client,
-    user: appState.filter.user,
-    search: appState.filter.search,
+    tags: store.filter.tags,
+    client: store.filter.client,
+    user: store.filter.user,
+    search: store.filter.search,
   };
 }
 
@@ -44,66 +44,85 @@ async function saveReport() {
   error.value = "";
   saved.value = "";
   try {
-    const path = await api.createReport(
-      format.value,
-      toFilter(),
-      dateFrom.value,
-      dateTo.value
-    );
+    const path = await api.createReport(format.value, toFilter(), dateFrom.value, dateTo.value);
     saved.value = path;
   } catch (e) {
     error.value = String(e);
   }
 }
 
-function onKeydown(e) {
-  if (e.key === "Escape") emit("close");
-}
-
-watch([dateFrom, dateTo, () => appState.filter.search], () => loadPreview());
-
-onMounted(() => {
-  window.addEventListener("keydown", onKeydown);
-  loadPreview();
+const open = computed({
+  get: () => true,
+  set: () => emit("close"),
 });
-onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
+
+watch([dateFrom, dateTo, () => store.filter.search], () => loadPreview());
+loadPreview();
 </script>
 
 <template>
-  <div class="overlay" @click.self="emit('close')">
-    <div class="modal modal-wide">
-      <div class="modal-head">
-        <span class="with-icon"><SvgIcon name="clock" />Отчёт</span>
-        <button class="icon" @click="emit('close')"><SvgIcon name="close" /></button>
-      </div>
-      <div class="modal-body">
-        <div class="form-grid2">
-          <div class="form-row">
-            <label>Дата с (дд.мм.гггг)</label>
-            <input v-model="dateFrom" placeholder="пусто = без ограничения" />
-          </div>
-          <div class="form-row">
-            <label>Дата по (дд.мм.гггг)</label>
-            <input v-model="dateTo" placeholder="пусто = без ограничения" />
-          </div>
-        </div>
-        <div class="form-row">
-          <label>Формат файла</label>
-          <select v-model="format">
-            <option v-for="f in formats" :key="f" :value="f">{{ f.toUpperCase() }}</option>
-          </select>
+  <v-dialog v-model="open" max-width="1000" max-height="85vh">
+    <v-card class="modal-card">
+      <v-toolbar density="compact" color="primary">
+        <v-toolbar-title>Отчёт</v-toolbar-title>
+      </v-toolbar>
+
+      <v-card-text class="pt-5">
+        <div class="d-flex ga-4 mb-3 flex-wrap">
+          <v-text-field
+            v-model="dateFrom"
+            label="Дата с (дд.мм.гггг)"
+            placeholder="пусто = без ограничения"
+            mask="##.##.####"
+            return-masked-value
+            density="compact"
+            variant="outlined"
+            hide-details
+            style="max-width: 220px"
+          />
+          <v-text-field
+            v-model="dateTo"
+            label="Дата по (дд.мм.гггг)"
+            placeholder="пусто = без ограничения"
+            mask="##.##.####"
+            return-masked-value
+            density="compact"
+            variant="outlined"
+            hide-details
+            style="max-width: 220px"
+          />
+          <v-autocomplete
+            v-model="format"
+            :items="formats.map((f) => ({ title: f.toUpperCase(), value: f }))"
+            label="Формат файла"
+            density="compact"
+            variant="outlined"
+            hide-details
+            style="max-width: 180px"
+          />
         </div>
 
-        <div v-if="error" class="banner-error">{{ error }}</div>
-        <div v-if="saved" class="banner-ok">Сохранено: {{ saved }}</div>
+        <v-alert v-if="error" type="error" density="compact" variant="tonal" class="mb-3">
+          {{ error }}
+        </v-alert>
+        <v-alert v-if="saved" type="success" density="compact" variant="tonal" class="mb-3">
+          Сохранено: {{ saved }}
+        </v-alert>
 
         <template v-if="preview">
-          <div class="stats-summary">
-            <span>Записей: <b>{{ preview.count }}</b></span>
-            <span>Общее время: <b>{{ preview.totalLabel }}</b></span>
-            <span v-for="t in preview.byTag" :key="t.name">{{ t.name }}: {{ t.timeLabel }}</span>
+          <div class="d-flex gap-4 mb-3 flex-wrap">
+            <v-chip size="small" variant="tonal" class="mr-2">
+              Записей: <b class="ml-1">{{ preview.count }}</b>
+            </v-chip>
+            <v-chip size="small" variant="tonal" class="mr-2">
+              Общее время: <b class="mono ml-1">{{ preview.totalLabel }}</b>
+            </v-chip>
+            <v-chip v-for="t in preview.byTag" :key="t.name" size="small" variant="tonal" class="mr-2">
+              {{ t.name }}: {{ t.timeLabel }}
+            </v-chip>
           </div>
-          <table class="grid compact">
+
+          <v-table density="compact" class="preview-table">
             <thead>
               <tr>
                 <th>Начало</th>
@@ -118,26 +137,28 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
             </thead>
             <tbody>
               <tr v-for="r in preview.rows" :key="r.taskId">
-                <td>{{ r.start }}</td>
-                <td>{{ r.end }}</td>
+                <td class="mono">{{ r.start }}</td>
+                <td class="mono">{{ r.end }}</td>
                 <td>{{ r.user }}</td>
                 <td>{{ r.order }}</td>
                 <td>{{ r.client }}</td>
-                <td>{{ r.tag }}</td>
-                <td>{{ r.elapsedLabel }}</td>
+                <td>{{ (r.tags || []).join(", ") }}</td>
+                <td class="mono">{{ r.elapsedLabel }}</td>
                 <td class="comment-cell">{{ r.comment }}</td>
               </tr>
             </tbody>
-          </table>
+          </v-table>
         </template>
-        <div v-if="loading" class="muted">Загрузка…</div>
-      </div>
-      <div class="modal-foot">
-        <button @click="emit('close')">Закрыть</button>
-        <button class="primary with-icon" :disabled="loading" @click="saveReport">
-          <SvgIcon name="export" />Сохранить в reports/
-        </button>
-      </div>
-    </div>
-  </div>
+        <div v-if="loading" class="text-medium-emphasis text-caption">Загрузка…</div>
+      </v-card-text>
+
+      <v-card-actions>
+        <v-spacer />
+        <v-btn variant="text" @click="emit('close')">Закрыть</v-btn>
+        <v-btn color="primary" variant="flat" :disabled="loading" prepend-icon="systemIcons:iconExport" @click="saveReport">
+          Сохранить в reports/
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>

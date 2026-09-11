@@ -1,9 +1,9 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch, computed } from "vue";
+import { ref, watch, computed } from "vue";
 import { api } from "../api";
-import { state as appState } from "../store";
-import SvgIcon from "../icons/SvgIcon.vue";
+import { useAppStore } from "../store";
 
+const store = useAppStore();
 const emit = defineEmits(["close"]);
 
 function firstOfMonth() {
@@ -11,8 +11,8 @@ function firstOfMonth() {
   return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
 }
 
-const dateFrom = ref(appState.filter.dateFrom || firstOfMonth());
-const dateTo = ref(appState.filter.dateTo || "");
+const dateFrom = ref(store.filter.dateFrom || firstOfMonth());
+const dateTo = ref(store.filter.dateTo || "");
 
 const formats = ["txt", "md", "csv", "xlsx"];
 const format = ref("txt");
@@ -26,10 +26,10 @@ function toFilter() {
   return {
     dateFrom: dateFrom.value,
     dateTo: dateTo.value,
-    tag: appState.filter.tag,
-    client: appState.filter.client,
-    user: appState.filter.user,
-    search: appState.filter.search,
+    tags: store.filter.tags,
+    client: store.filter.client,
+    user: store.filter.user,
+    search: store.filter.search,
   };
 }
 
@@ -50,23 +50,17 @@ async function saveStats() {
   error.value = "";
   saved.value = "";
   try {
-    const path = await api.createStats(
-      format.value,
-      toFilter(),
-      dateFrom.value,
-      dateTo.value
-    );
+    const path = await api.createStats(format.value, toFilter(), dateFrom.value, dateTo.value);
     saved.value = path;
   } catch (e) {
     error.value = String(e);
   }
 }
 
-function onKeydown(e) {
-  if (e.key === "Escape") emit("close");
-}
-
-watch([dateFrom, dateTo], () => loadStats());
+const open = computed({
+  get: () => true,
+  set: () => emit("close"),
+});
 
 const sections = computed(() => {
   if (!stats.value) return [];
@@ -78,50 +72,73 @@ const sections = computed(() => {
   ];
 });
 
-onMounted(() => {
-  window.addEventListener("keydown", onKeydown);
-  loadStats();
-});
-onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
+watch([dateFrom, dateTo], () => loadStats());
+loadStats();
 </script>
 
 <template>
-  <div class="overlay" @click.self="emit('close')">
-    <div class="modal modal-suit">
-      <div class="modal-head">
-        <span class="with-icon"><SvgIcon name="chart" />Статистика</span>
-        <button class="icon" @click="emit('close')"><SvgIcon name="close" /></button>
-      </div>
-      <div class="modal-body">
-        <div class="form-grid2">
-          <div class="form-row">
-            <label>Дата с (дд.мм.гггг)</label>
-            <input v-model="dateFrom" />
-          </div>
-          <div class="form-row">
-            <label>Дата по (дд.мм.гггг)</label>
-            <input v-model="dateTo" />
-          </div>
-        </div>
-        <div class="form-row" style="max-width: 180px">
-          <label>Формат файла</label>
-          <select v-model="format">
-            <option v-for="f in formats" :key="f" :value="f">{{ f.toUpperCase() }}</option>
-          </select>
+  <v-dialog v-model="open" max-width="820" max-height="85vh">
+    <v-card class="modal-card">
+      <v-toolbar density="compact" color="primary">
+        <v-toolbar-title>Статистика</v-toolbar-title>
+      </v-toolbar>
+
+      <v-card-text class="pt-5">
+        <div class="d-flex ga-4 mb-3 flex-wrap">
+          <v-text-field
+            v-model="dateFrom"
+            label="Дата с (дд.мм.гггг)"
+            mask="##.##.####"
+            return-masked-value
+            density="compact"
+            variant="outlined"
+            hide-details
+            style="max-width: 220px"
+          />
+          <v-text-field
+            v-model="dateTo"
+            label="Дата по (дд.мм.гггг)"
+            mask="##.##.####"
+            return-masked-value
+            density="compact"
+            variant="outlined"
+            hide-details
+            style="max-width: 220px"
+          />
+          <v-autocomplete
+            v-model="format"
+            :items="formats.map((f) => ({ title: f.toUpperCase(), value: f }))"
+            label="Формат файла"
+            density="compact"
+            variant="outlined"
+            hide-details
+            style="max-width: 180px"
+          />
         </div>
 
-        <div v-if="error" class="banner-error">{{ error }}</div>
-        <div v-if="saved" class="banner-ok">Сохранено: {{ saved }}</div>
+        <v-alert v-if="error" type="error" density="compact" variant="tonal" class="mb-3">
+          {{ error }}
+        </v-alert>
+        <v-alert v-if="saved" type="success" density="compact" variant="tonal" class="mb-3">
+          Сохранено: {{ saved }}
+        </v-alert>
 
         <template v-if="stats">
-          <div class="stats-summary">
-            <span>Записей: <b>{{ stats.count }}</b></span>
-            <span>Общее время: <b>{{ stats.totalLabel }}</b></span>
-            <span>Среднее: <b>{{ stats.avgLabel }}</b></span>
+          <div class="d-flex gap-4 mb-3 flex-wrap">
+            <v-chip size="small" variant="tonal" class="mr-2">
+              Записей: <b class="ml-1">{{ stats.count }}</b>
+            </v-chip>
+            <v-chip size="small" variant="tonal" class="mr-2">
+              Общее время: <b class="mono ml-1">{{ stats.totalLabel }}</b>
+            </v-chip>
+            <v-chip size="small" variant="tonal" class="mr-2">
+              Среднее: <b class="mono ml-1">{{ stats.avgLabel }}</b>
+            </v-chip>
           </div>
-          <div v-for="sec in sections" :key="sec.title" class="stats-section">
-            <h3>{{ sec.title }}</h3>
-            <table v-if="sec.items.length" class="grid compact">
+
+          <div v-for="sec in sections" :key="sec.title" class="mb-4">
+            <h3 class="text-subtitle-2 mb-1">{{ sec.title }}</h3>
+            <v-table v-if="sec.items.length" density="compact">
               <thead>
                 <tr>
                   <th>Имя</th>
@@ -134,22 +151,24 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
                 <tr v-for="it in sec.items" :key="it.name">
                   <td>{{ it.name }}</td>
                   <td>{{ it.count }}</td>
-                  <td>{{ it.totalLabel }}</td>
-                  <td>{{ it.avgLabel }}</td>
+                  <td class="mono">{{ it.totalLabel }}</td>
+                  <td class="mono">{{ it.avgLabel }}</td>
                 </tr>
               </tbody>
-            </table>
-            <div v-else class="muted">Нет данных</div>
+            </v-table>
+            <div v-else class="text-medium-emphasis text-caption">Нет данных</div>
           </div>
         </template>
-        <div v-if="loading" class="muted">Загрузка…</div>
-      </div>
-      <div class="modal-foot">
-        <button @click="emit('close')">Закрыть</button>
-        <button class="primary with-icon" :disabled="loading" @click="saveStats">
-          <SvgIcon name="export" />Экспорт ({{ format.toUpperCase() }})
-        </button>
-      </div>
-    </div>
-  </div>
+        <div v-if="loading" class="text-medium-emphasis text-caption">Загрузка…</div>
+      </v-card-text>
+
+      <v-card-actions>
+        <v-spacer />
+        <v-btn variant="text" @click="emit('close')">Закрыть</v-btn>
+        <v-btn color="primary" variant="flat" :disabled="loading" prepend-icon="systemIcons:iconExport" @click="saveStats">
+          Экспорт ({{ format.toUpperCase() }})
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>

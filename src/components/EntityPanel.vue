@@ -1,6 +1,5 @@
 <script setup>
 import { ref } from "vue";
-import SvgIcon from "../icons/SvgIcon.vue";
 
 const props = defineProps({
   kind: { type: String, required: true },
@@ -15,7 +14,7 @@ const editingKey = ref(null);
 const editName = ref("");
 
 function keyOf(item) {
-  return props.kind === "user" ? item : item.id;
+  return props.kind === "user" ? item : String(item.id);
 }
 function nameOf(item) {
   return typeof item === "string" ? item : item.name;
@@ -46,45 +45,64 @@ function add() {
 }
 
 function remove(item) {
-  const key = keyOf(item);
   const title = props.title;
   if (!window.confirm(`Удалить «${nameOf(item)}» из ${title.toLowerCase()}?`)) return;
-  emit("action", { action: "remove", id: key, name: nameOf(item) });
+  emit("action", { action: "remove", id: keyOf(item), name: nameOf(item) });
 }
 </script>
 
 <template>
-  <div class="entity-panel">
-    <h3>{{ title }}</h3>
-    <div class="entity-list">
-      <div v-if="!items.length" class="empty" style="padding: 8px">Нет элементов</div>
-      <div v-for="item in items" :key="keyOf(item)" class="entity-row">
+  <div>
+    <v-list
+      variant="outlined"
+      density="compact"
+      class="mb-3"
+      style="max-height: 280px; overflow-y: auto"
+    >
+      <v-list-item v-if="!items.length" class="text-medium-emphasis text-caption">Нет элементов</v-list-item>
+      <v-list-item v-for="item in items" :key="keyOf(item)" class="px-2">
         <template v-if="editingKey === keyOf(item)">
-          <input
-            v-model="editName"
-            style="flex: 1; min-width: 0"
-            @keydown.enter="saveEdit(keyOf(item), nameOf(item))"
-            @keydown.esc="cancelEdit"
-          />
-          <button class="small" @click="saveEdit(keyOf(item), nameOf(item))"><SvgIcon name="check" /></button>
-          <button class="small" @click="cancelEdit"><SvgIcon name="close" /></button>
+          <div class="d-flex align-center ga-2">
+            <v-text-field
+              v-model="editName"
+              density="compact"
+              variant="outlined"
+              hide-details
+              @keydown.enter="saveEdit(keyOf(item), nameOf(item))"
+              @keydown.esc="cancelEdit"
+            />
+            <v-btn icon aria-label="Сохранить" variant="text" size="small" @click="saveEdit(keyOf(item), nameOf(item))">
+              <v-icon icon="systemIcons:iconCheck" />
+            </v-btn>
+            <v-btn icon aria-label="Отмена" variant="text" size="small" @click="cancelEdit">
+              <v-icon icon="systemIcons:iconClose" />
+            </v-btn>
+          </div>
         </template>
         <template v-else>
-          <span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis">
-            {{ nameOf(item) }}
-          </span>
-          <button class="small with-icon" @click="startEdit(keyOf(item), nameOf(item))"><SvgIcon name="edit" /></button>
-          <button class="small danger with-icon" @click="remove(item)"><SvgIcon name="trash" /></button>
+          <div class="d-flex align-center">
+            <span class="flex-grow-1 text-truncate">{{ nameOf(item) }}</span>
+            <v-btn icon aria-label="Редактировать" variant="text" size="small" @click="startEdit(keyOf(item), nameOf(item))">
+              <v-icon icon="systemIcons:iconEdit" />
+            </v-btn>
+            <v-btn icon aria-label="Удалить" variant="text" size="small" color="error" @click="remove(item)">
+              <v-icon icon="systemIcons:iconTrash" />
+            </v-btn>
+          </div>
         </template>
-      </div>
-    </div>
-    <div class="entity-add">
-      <input
+      </v-list-item>
+    </v-list>
+
+    <div class="d-flex ga-2">
+      <v-text-field
         v-model="newName"
         placeholder="Новое имя…"
+        density="compact"
+        variant="outlined"
+        hide-details
         @keydown.enter="add"
       />
-      <button class="small" @click="add">Добавить</button>
+      <v-btn variant="tonal" @click="add">Добавить</v-btn>
     </div>
   </div>
 </template>
