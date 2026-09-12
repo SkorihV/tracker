@@ -14,6 +14,7 @@
     "@mdi/font": "^7.4.47",
     "@tauri-apps/api": "^2.0.0",
     "@tauri-apps/plugin-dialog": "^2.7.3",
+    "maska": "^3.2.1",
     "pinia": "^4.0.3",
     "vue": "^3.4.0",
     "vuetify": "^4.2.1"

@@ -1,5 +1,6 @@
 <script setup>
 import { useAppStore } from "../../store.js";
+import { dateRule } from "../../dateRules.js";
 
 const store = useAppStore();
 
@@ -21,20 +22,20 @@ function clearDates() {
     <v-text-field
       v-model="store.filter.dateFrom"
       placeholder="дд.мм.гггг"
-      mask="##.##.####"
-      return-masked-value
+      v-maska="'##.##.####'"
+      :rules="[dateRule]"
       density="compact"
       variant="outlined"
       hide-details
       style="max-width: 140px"
       @keydown.enter="store.refreshQuery()"
     />
-    <span class="text-body-2 text-medium-emphasis">По</span>11
+    <span class="text-body-2 text-medium-emphasis">По</span>
     <v-text-field
       v-model="store.filter.dateTo"
       placeholder="дд.мм.гггг"
-      mask="##.##.####"
-      return-masked-value
+      v-maska="'##.##.####'"
+      :rules="[dateRule]"
       density="compact"
       variant="outlined"
       hide-details

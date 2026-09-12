@@ -2,6 +2,7 @@
 import { ref, watch, computed } from "vue";
 import { api } from "../api";
 import { useAppStore } from "../store";
+import { dateRule } from "../dateRules.js";
 
 const store = useAppStore();
 const emit = defineEmits(["close"]);
@@ -77,8 +78,8 @@ loadPreview();
             v-model="dateFrom"
             label="Дата с (дд.мм.гггг)"
             placeholder="пусто = без ограничения"
-            mask="##.##.####"
-            return-masked-value
+            v-maska="'##.##.####'"
+            :rules="[dateRule]"
             density="compact"
             variant="outlined"
             hide-details
@@ -88,8 +89,8 @@ loadPreview();
             v-model="dateTo"
             label="Дата по (дд.мм.гггг)"
             placeholder="пусто = без ограничения"
-            mask="##.##.####"
-            return-masked-value
+            v-maska="'##.##.####'"
+            :rules="[dateRule]"
             density="compact"
             variant="outlined"
             hide-details
@@ -126,7 +127,7 @@ loadPreview();
             </v-chip>
           </div>
 
-          <v-table density="compact" class="preview-table">
+          <v-table density="compact" class="max-width-table">
             <thead>
               <tr>
                 <th>Начало</th>

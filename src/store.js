@@ -1,12 +1,29 @@
 import { defineStore } from "pinia";
 import { api } from "./api";
+import vuetify from "./plugins/vuetify";
 
-const COLUMNS_KEY = "tt.columns";
+export const DEFAULT_ACCENT_COLOR = "#4caf50";
+export const DEFAULT_OUR_CAR_COLOR = "#2196f3";
+export const DEFAULT_TABLE_FONT_FAMILY = "Roboto";
+export const DEFAULT_TABLE_FONT_SIZE = 14;
+
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+
+function applyAccentToTheme(color) {
+  const c = HEX_RE.test(color || "") ? color : DEFAULT_ACCENT_COLOR;
+  try {
+    const light = vuetify?.theme?.themes?.value?.light;
+    if (light && light.colors) light.colors.primary = c;
+  } catch {
+    /* ignore */
+  }
+}
 
 function defaultColumns() {
   return [
     { key: "time", label: "Время", visible: true, width: '100px' },
     { key: "status", label: "Статус", visible: true, width: '' },
+    { key: "ourCar", label: "Наша машина", visible: true, width: '' },
     { key: "actions", label: "Действия", visible: true, width: '' },
     { key: "mode", label: "Режим", visible: true, width: '' },
     { key: "order", label: "Заявка", visible: true, width: '' },
@@ -17,31 +34,27 @@ function defaultColumns() {
 
     { key: "user", label: "Пользователь", visible: true, width: '' },
     { key: "comment", label: "Комментарий", visible: true, width: '' },
-    { key: "taskId", label: "ID", visible: true, width: '' },
+    { key: "taskId", label: "ID", visible: false, width: '' },
   ]
 }
 
 function loadColumns() {
+  return defaultColumns();
+}
+
+// Порядок колонок, хранящийся на бэкенде. Данные приходят уже в нужном
+// порядке и с корректными ключами — просто дополняем метаданными defs.
+function mergeColumnsFromBackend(prefs) {
   const defs = defaultColumns();
   const byKey = new Map(defs.map((d) => [d.key, d]));
-  let stored = null;
-  try {
-    stored = JSON.parse(localStorage.getItem(COLUMNS_KEY) || "null");
-  } catch {
-    stored = null;
-  }
-  if (!Array.isArray(stored)) return defs;
+  if (!Array.isArray(prefs) || prefs.length === 0) return defs;
   const out = [];
   const used = new Set();
-  for (const s of stored) {
-    // Миграция: в старых версиях key "status" означал «Режим» (running/пауза),
-    // новая колонка «Статус» получает отдельный key "status".
-    let key = s?.key === "status" ? "mode" : s?.key;
-    // "tag" переименован в "tags" (совпадение с полем строки для сортировки).
-    if (key === "tag") key = "tags";
-    const d = byKey.get(key);
-    if (d && !used.has(key)) {
-      used.add(key);
+  for (const s of prefs) {
+    if (typeof s.key !== "string") continue;
+    const d = byKey.get(s.key);
+    if (d && !used.has(s.key)) {
+      used.add(s.key);
       out.push({ ...d, visible: s.visible !== false });
     }
   }
@@ -56,10 +69,11 @@ function loadColumns() {
 
 export const useAppStore = defineStore("app", {
   state: () => ({
+    showSettings: false,
     ready: false,
     loading: true,
     error: "",
-    settings: { username: "", grouping: "none" },
+    settings: { username: "", grouping: "none", accentColor: DEFAULT_ACCENT_COLOR, ourCarColor: DEFAULT_OUR_CAR_COLOR, fontFamily: DEFAULT_TABLE_FONT_FAMILY, fontSize: DEFAULT_TABLE_FONT_SIZE },
     users: [],
     tags: [],
     clients: [],
@@ -90,12 +104,22 @@ export const useAppStore = defineStore("app", {
     async refresh() {
       try {
         const s = await api.getState();
-        this.settings = s.settings;
+        this.settings = {
+          username: s.settings?.username || "",
+          grouping: s.settings?.grouping || "none",
+          accentColor: HEX_RE.test(s.settings?.accent_color || "") ? s.settings.accent_color : DEFAULT_ACCENT_COLOR,
+          ourCarColor: HEX_RE.test(s.settings?.our_car_color || "") ? s.settings.our_car_color : DEFAULT_OUR_CAR_COLOR,
+          fontFamily: s.settings?.font_family && s.settings.font_family.trim() !== "" ? s.settings.font_family : DEFAULT_TABLE_FONT_FAMILY,
+          fontSize: s.settings?.font_size >= 8 && s.settings.font_size <= 40 ? s.settings.font_size : DEFAULT_TABLE_FONT_SIZE,
+          columns: s.settings?.columns || [],
+        };
+        this.columns = mergeColumnsFromBackend(s.settings?.columns);
         this.users = s.users || [];
         this.tags = s.tags || [];
         this.clients = s.clients || [];
         this.statuses = s.statuses || [];
         this.error = "";
+        applyAccentToTheme(this.settings.accentColor);
       } catch (e) {
         this.error = String(e);
       }
@@ -115,10 +139,38 @@ export const useAppStore = defineStore("app", {
     },
 
     async applySettings(username, grouping) {
-      await api.setSettings(username, grouping);
+      await api.setSettings(username, grouping, this.settings.accentColor);
       this.settings.username = username;
       this.settings.grouping = grouping;
       await this.refresh();
+      await this.refreshQuery();
+    },
+
+    /** Изменить акцентный цвет кнопок и заголовков. */
+    async setAccentColor(color) {
+      const c = HEX_RE.test(color || "") ? color : DEFAULT_ACCENT_COLOR;
+      await api.setSettings(this.settings.username, this.settings.grouping, c);
+      this.settings.accentColor = c;
+      applyAccentToTheme(c);
+      await this.refreshQuery();
+    },
+
+    /** Изменить цвет ячейки «Наша машина». */
+    async setOurCarColor(color) {
+      const c = HEX_RE.test(color || "") ? color : DEFAULT_OUR_CAR_COLOR;
+      await api.setOurCarColor(c);
+      this.settings.ourCarColor = c;
+      await this.refreshQuery();
+    },
+
+    /** Изменить вид и размер шрифта таблицы задач. */
+    async setTableFont(family, size) {
+      const f = String(family || "").trim() || DEFAULT_TABLE_FONT_FAMILY;
+      const s = Number(size);
+      const sz = Number.isInteger(s) && s >= 8 && s <= 40 ? s : DEFAULT_TABLE_FONT_SIZE;
+      await api.setTableFont(f, sz);
+      this.settings.fontFamily = f;
+      this.settings.fontSize = sz;
       await this.refreshQuery();
     },
 
@@ -211,16 +263,17 @@ export const useAppStore = defineStore("app", {
       await this.refreshQuery();
     },
 
-    persistColumns() {
+    async persistColumns() {
+      const list = this.columns.map((c) => ({ key: c.key, visible: c.visible }));
       try {
-        localStorage.setItem(COLUMNS_KEY, JSON.stringify(this.columns));
+        await api.setColumns(list);
       } catch {
         /* ignore */
       }
     },
 
     /** Вернуть колонки к порядку по умолчанию (видимость сохраняется). */
-    resetColumns() {
+    async resetColumns() {
       const byKey = new Map(this.columns.map((c) => [c.key, c]));
       const out = [];
       const used = new Set();
@@ -235,22 +288,22 @@ export const useAppStore = defineStore("app", {
         }
       }
       this.columns = out;
-      this.persistColumns();
+      await this.persistColumns();
     },
 
-    moveColumn(from, to) {
+    async moveColumn(from, to) {
       const arr = [...this.columns];
       if (from < 0 || from >= arr.length || to < 0 || to >= arr.length || from === to) return;
       const [col] = arr.splice(from, 1);
       arr.splice(to, 0, col);
       this.columns = arr;
-      this.persistColumns();
+      await this.persistColumns();
     },
 
-    setColumnVisible(key, visible) {
+    async setColumnVisible(key, visible) {
       const col = this.columns.find((c) => c.key === key);
       if (col) col.visible = !!visible;
-      this.persistColumns();
+      await this.persistColumns();
     },
   },
 });

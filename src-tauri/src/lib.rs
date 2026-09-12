@@ -7,6 +7,7 @@ use std::sync::Mutex;
 use tauri::State;
 use tracker_core::backups;
 use tracker_core::logic::TaskFilter;
+use tracker_core::models::ColumnPref;
 use tracker_core::models::TaskDraft;
 use tracker_core::report;
 use tracker_core::store::Store;
@@ -51,7 +52,8 @@ fn create_report(
 ) -> Result<String, String> {
     let st = s.0.lock().map_err(|e| e.to_string())?;
     let base = base_dir();
-    let path = report::write_report(&base, &format, &st.tasks, &filter, &date_from, &date_to)?;
+    let accent = st.settings.accent_color.clone();
+    let path = report::write_report(&base, &format, &st.tasks, &filter, &date_from, &date_to, &accent)?;
     Ok(path.to_string_lossy().to_string())
 }
 
@@ -71,7 +73,8 @@ fn create_stats(
 ) -> Result<String, String> {
     let st = s.0.lock().map_err(|e| e.to_string())?;
     let base = base_dir();
-    let path = report::write_stats(&base, &format, &st.tasks, &filter, &date_from, &date_to)?;
+    let accent = st.settings.accent_color.clone();
+    let path = report::write_stats(&base, &format, &st.tasks, &filter, &date_from, &date_to, &accent)?;
     Ok(path.to_string_lossy().to_string())
 }
 
@@ -102,15 +105,15 @@ fn import_json(
 }
 
 #[tauri::command]
-fn create_task(s: State<'_, AppStore>, user: String, order: String, tags: Vec<String>, client: String, comment: String, custom_status: String) -> Result<tracker_core::models::AppTask, String> {
+fn create_task(s: State<'_, AppStore>, user: String, order: String, tags: Vec<String>, client: String, comment: String, custom_status: String, our_car: bool) -> Result<tracker_core::models::AppTask, String> {
     let mut st = s.0.lock().map_err(|e| e.to_string())?;
-    Ok(st.create_task(TaskDraft { user, order, tags, client, comment, custom_status }))
+    Ok(st.create_task(TaskDraft { user, order, tags, client, comment, custom_status, our_car }))
 }
 
 #[tauri::command]
-fn update_task(s: State<'_, AppStore>, task_id: String, user: String, order: String, tags: Vec<String>, client: String, comment: String, custom_status: String) -> Result<(), String> {
+fn update_task(s: State<'_, AppStore>, task_id: String, user: String, order: String, tags: Vec<String>, client: String, comment: String, custom_status: String, our_car: bool) -> Result<(), String> {
     let mut st = s.0.lock().map_err(|e| e.to_string())?;
-    st.update_task(&task_id, TaskDraft { user, order, tags, client, comment, custom_status });
+    st.update_task(&task_id, TaskDraft { user, order, tags, client, comment, custom_status, our_car });
     Ok(())
 }
 
@@ -166,8 +169,34 @@ fn remove_tasks(s: State<'_, AppStore>, ids: Vec<String>) -> Result<(), String> 
 }
 
 #[tauri::command]
-fn set_settings(s: State<'_, AppStore>, username: String, grouping: String) -> Result<(), String> {
-    s.0.lock().map_err(|e| e.to_string())?.set_settings(username, grouping);
+fn set_settings(s: State<'_, AppStore>, username: String, grouping: String, accent_color: String) -> Result<(), String> {
+    s.0.lock()
+        .map_err(|e| e.to_string())?
+        .set_settings(username, grouping, accent_color);
+    Ok(())
+}
+
+#[tauri::command]
+fn set_our_car_color(s: State<'_, AppStore>, color: String) -> Result<(), String> {
+    s.0.lock()
+        .map_err(|e| e.to_string())?
+        .set_our_car_color(color);
+    Ok(())
+}
+
+#[tauri::command]
+fn set_table_font(s: State<'_, AppStore>, family: String, size: u32) -> Result<(), String> {
+    s.0.lock()
+        .map_err(|e| e.to_string())?
+        .set_table_font(family, size);
+    Ok(())
+}
+
+#[tauri::command]
+fn set_columns(s: State<'_, AppStore>, columns: Vec<ColumnPref>) -> Result<(), String> {
+    s.0.lock()
+        .map_err(|e| e.to_string())?
+        .set_columns(columns);
     Ok(())
 }
 
@@ -350,6 +379,9 @@ pub fn run() {
             complete_task,
             remove_tasks,
             set_settings,
+            set_our_car_color,
+            set_table_font,
+            set_columns,
             add_user,
             remove_user,
             clear_users,

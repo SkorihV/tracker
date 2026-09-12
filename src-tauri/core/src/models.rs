@@ -13,9 +13,34 @@ use crate::dt::{fmt_dt, now_naive, parse_dt};
 // ---------------------------------------------------------------------
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ColumnPref {
+    pub key: String,
+    pub visible: bool,
+}
+
+impl ColumnPref {
+    pub fn from_json(v: &J) -> Option<ColumnPref> {
+        let obj = v.as_object()?;
+        let key = obj.get("key")?.as_str()?.trim();
+        if key.is_empty() {
+            return None;
+        }
+        Some(ColumnPref {
+            key: key.to_string(),
+            visible: obj.get("visible").and_then(|x| x.as_bool()).unwrap_or(true),
+        })
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Settings {
     pub username: String,
     pub grouping: String, // "none" | "day" | "client"
+    pub accent_color: String, // цвет кнопок/заголовков (hex "#rrggbb")
+    pub our_car_color: String, // цвет ячейки «Наша машина» (hex "#rrggbb")
+    pub font_family: String, // вид шрифта таблицы задач (CSS font-family)
+    pub font_size: u32, // размер шрифта таблицы задач (px)
+    pub columns: Vec<ColumnPref>, // порядок и видимость колонок таблицы
 }
 
 impl Default for Settings {
@@ -23,6 +48,11 @@ impl Default for Settings {
         Settings {
             username: String::new(),
             grouping: "none".into(),
+            accent_color: "#4caf50".into(),
+            our_car_color: "#2196f3".into(),
+            font_family: "Roboto".into(),
+            font_size: 14,
+            columns: Vec::new(),
         }
     }
 }
@@ -35,6 +65,32 @@ impl Settings {
             .and_then(|x| x.as_str())
             .unwrap_or("none")
             .to_string();
+        let accent_color = obj
+            .and_then(|o| o.get("accent_color"))
+            .and_then(|x| x.as_str())
+            .unwrap_or("#4caf50")
+            .to_string();
+        let our_car_color = obj
+            .and_then(|o| o.get("our_car_color"))
+            .and_then(|x| x.as_str())
+            .unwrap_or("#2196f3")
+            .to_string();
+        let font_family = obj
+            .and_then(|o| o.get("font_family"))
+            .and_then(|x| x.as_str())
+            .filter(|s| !s.trim().is_empty())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "Roboto".to_string());
+        let font_size = obj
+            .and_then(|o| o.get("font_size"))
+            .and_then(|x| x.as_u64())
+            .filter(|v| *v >= 8 && *v <= 40)
+            .unwrap_or(14) as u32;
+        let columns = obj
+            .and_then(|o| o.get("columns"))
+            .and_then(|x| x.as_array())
+            .map(|a| a.iter().filter_map(ColumnPref::from_json).collect())
+            .unwrap_or_default();
         Settings {
             username: obj
                 .and_then(|o| o.get("username"))
@@ -42,11 +98,24 @@ impl Settings {
                 .unwrap_or("")
                 .to_string(),
             grouping,
+            accent_color,
+            our_car_color,
+            font_family,
+            font_size,
+            columns,
         }
     }
 
     pub fn to_json(&self) -> J {
-        serde_json::json!({ "username": self.username, "grouping": self.grouping })
+        serde_json::json!({
+            "username": self.username,
+            "grouping": self.grouping,
+            "accent_color": self.accent_color,
+            "our_car_color": self.our_car_color,
+            "font_family": self.font_family,
+            "font_size": self.font_size,
+            "columns": self.columns,
+        })
     }
 }
 
@@ -165,6 +234,7 @@ pub struct Task {
     pub custom_status: String,
     pub comment: String,
     pub intervals: Vec<Interval>,
+    pub our_car: bool,
 }
 
 fn str_at(obj: &serde_json::Map<String, J>, key: &str) -> String {
@@ -228,6 +298,7 @@ impl Task {
             custom_status: str_at(obj, "custom_status"),
             comment: str_at(obj, "comment"),
             intervals,
+            our_car: obj.get("our_car").and_then(|x| x.as_bool()).unwrap_or(false),
         })
     }
 
@@ -343,6 +414,7 @@ impl Task {
             "status": self.status.as_str(),
             "custom_status": self.custom_status,
             "comment": self.comment,
+            "our_car": self.our_car,
             "seconds": self.total_seconds(now),
             "intervals": intervals,
             "start": fmt_dt(self.start_date()),
@@ -377,6 +449,8 @@ pub struct AppTask {
     pub end_label: Option<String>,
     pub intervals_count: usize,
     pub ranges: Vec<AppInterval>,
+    #[serde(rename = "ourCar")]
+    pub our_car: bool,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -410,6 +484,7 @@ impl AppTask {
                     stop: i.stop.map(fmt_dt),
                 })
                 .collect(),
+            our_car: t.our_car,
         }
     }
 }
@@ -436,6 +511,8 @@ pub struct TaskDraft {
     pub client: String,
     pub comment: String,
     pub custom_status: String,
+    #[serde(default)]
+    pub our_car: bool,
 }
 
 impl TaskDraft {
@@ -453,6 +530,7 @@ impl TaskDraft {
         t.client = self.client.trim().to_string();
         t.comment = self.comment.trim().to_string();
         t.custom_status = self.custom_status.trim().to_string();
+        t.our_car = self.our_car;
     }
 }
 

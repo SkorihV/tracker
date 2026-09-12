@@ -31,36 +31,36 @@ defineOptions({name:'TaskActions'})
 <template>
   <div class="d-flex ga-1">
     <template v-if="task.mode === 'running'">
-      <v-btn icon aria-label="Пауза" variant="text" size="x-small" @click.stop="onPause(task)">
-        <v-icon icon="systemIcons:iconPause" color="orange" />
-      </v-btn>
-      <v-btn icon aria-label="Завершить" variant="text" size="x-small" @click.stop="onComplete(task)">
-        <v-icon icon="systemIcons:iconStop" color="red"/>
-      </v-btn>
+      <v-sheet v-tooltip:bottom="'Пауза'" color="transparent" @click.stop="onPause(task)">
+        <v-icon size="large" icon="systemIcons:iconPause" color="orange" />
+      </v-sheet>
+      <v-sheet v-tooltip:bottom="'Завершить'" color="transparent" @click.stop="onComplete(task)">
+        <v-icon size="large" icon="systemIcons:iconStop" color="red" />
+      </v-sheet>
     </template>
     <template v-else-if="task.mode === 'paused'">
-      <v-btn icon aria-label="Возобновить" variant="text" size="x-small" @click.stop="onStart(task)">
-        <v-icon icon="systemIcons:iconPlay" color="green"/>
-      </v-btn>
-      <v-btn icon aria-label="Завершить" variant="text" size="x-small" @click.stop="onComplete(task)">
-        <v-icon icon="systemIcons:iconStop" color="red"/>
-      </v-btn>
+      <v-sheet v-tooltip:bottom="'Возобновить'" color="transparent" @click.stop="onStart(task)">
+        <v-icon size="large" icon="systemIcons:iconPlay" color="green" />
+      </v-sheet>
+      <v-sheet disabled v-tooltip:bottom="'Завершить'" color="transparent" @click.stop="onComplete(task)">
+        <v-icon size="large" icon="systemIcons:iconStop" color="red" />
+      </v-sheet>
     </template>
     <template v-else>
-      <v-btn icon aria-label="Возобновить" variant="text" size="x-small" @click.stop="onStart(task)">
-        <v-icon icon="systemIcons:iconPlay" color="green"/>
-      </v-btn>
-      <v-btn icon aria-label="Завершить" disabled variant="text" size="x-small" @click.stop="onComplete(task)">
-        <v-icon icon="systemIcons:iconStop" color="red"/>
-      </v-btn>
+      <v-sheet v-tooltip:bottom="'Возобновить'" color="transparent" @click.stop="onStart(task)">
+        <v-icon size="large" icon="systemIcons:iconPlay" color="green" />
+      </v-sheet>
+      <v-sheet disabled color="transparent">
+        <v-icon size="large" icon="systemIcons:iconStop" color="grey" />
+      </v-sheet>
     </template>
 
-    <v-btn icon aria-label="Редактировать" variant="text" size="x-small" @click.stop="emit('edit', task)">
-      <v-icon icon="systemIcons:iconEdit" />
-    </v-btn>
-    <v-btn icon aria-label="Удалить" variant="text" size="x-small" color="error" @click.stop="emit('delete', [task.taskId])">
-      <v-icon icon="systemIcons:iconTrash" />
-    </v-btn>
+    <v-sheet v-tooltip:bottom="'Редактировать'" color="transparent" @click.stop="emit('edit', task)">
+      <v-icon size="large" icon="systemIcons:iconEdit" color="purple" />
+    </v-sheet>
+    <v-sheet v-tooltip:bottom="'Удалить'" color="transparent" @click.stop="emit('delete', [task.taskId])">
+      <v-icon size="large" icon="systemIcons:iconTrash" color="error" />
+    </v-sheet>
   </div>
 </template>
 

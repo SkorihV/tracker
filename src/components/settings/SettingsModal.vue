@@ -4,6 +4,7 @@ import { useAppStore } from "../../store.js";
 import EntityPanel from "../EntityPanel.vue";
 import ColumnsTab from "./tabs/ColumnsTab.vue";
 import StatusesTab from "./tabs/StatusesTab.vue";
+import GeneralTab from "./tabs/GeneralTab.vue";
 
 const store = useAppStore();
 const emit = defineEmits(["close"]);
@@ -38,17 +39,8 @@ async function onAction(kind, payload) {
       </v-toolbar>
 
       <v-card-text class="pt-5">
-        <v-autocomplete
-          v-model="curUser"
-          :items="store.users.map((u) => ({ title: u, value: u }))"
-          label="Текущий пользователь (для новых задач)"
-          density="compact"
-          variant="outlined"
-          class="mb-4"
-          style="max-width: 360px"
-        />
-
         <v-tabs v-model="tab" color="primary" class="mb-4">
+          <v-tab value="general">Общее</v-tab>
           <v-tab value="users">Пользователи</v-tab>
           <v-tab value="tags">Теги</v-tab>
           <v-tab value="clients">Клиенты</v-tab>
@@ -56,7 +48,19 @@ async function onAction(kind, payload) {
           <v-tab value="tasks">Заголовки таблицы</v-tab>
         </v-tabs>
 
+        <div v-if="tab === 'general'">
+          <GeneralTab />
+        </div>
         <div v-if="tab === 'users'">
+          <v-autocomplete
+              v-model="curUser"
+              :items="store.users.map((u) => ({ title: u, value: u }))"
+              label="Текущий пользователь (для новых задач)"
+              density="compact"
+              variant="outlined"
+              class="mb-4"
+              style="max-width: 360px"
+          />
           <EntityPanel kind="user" title="Пользователи" :items="store.users" @action="(p) => onAction('user', p)" />
         </div>
         <div v-if="tab === 'tags'">

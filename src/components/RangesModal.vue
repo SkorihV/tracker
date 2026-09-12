@@ -58,7 +58,7 @@ function save() {
       </v-toolbar>
       <v-card-text class="pa-4 flex-grow-1 d-flex flex-column">
         <div class="text-caption text-medium-emphasis mb-2">
-          По строке: «дд.мм.гггг чч:мм — дд.мм.гггг чч:мм» (или просто «дд.мм.гггг чч:мм» — открытый).
+          По строке: «дд.мм.гггг мм:чч — дд.мм.гггг мм:чч» (или просто «дд.мм.гггг мм:чч» — открытый).
           Завершение можно не заполнять.
         </div>
         <v-textarea

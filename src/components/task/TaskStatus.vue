@@ -1,7 +1,7 @@
 <script setup>
 import {computed, defineProps} from 'vue'
 import {useAppStore} from "../../store.js";
-import {statusHex} from "../../statusColors.js";
+import {statusHex, statusTextHex} from "../../statusColors.js";
 const store = useAppStore()
 const props = defineProps({
   task: Object
@@ -15,8 +15,10 @@ function statusColorOf(row) {
 
 const statusCellStyle = (row) => {
   const c = statusColorOf(row);
-  return c ? `background-color: ${c};` : "";
+  return { backgroundColor: c, color: statusTextHex(c) };
 };
+
+const statusTextColor = computed(() => statusTextHex(statusColorOf(props.task)));
 
 async function onChangeStatus(row, value) {
   if (value === props.task.status) return;
@@ -41,8 +43,9 @@ defineOptions({name:'TaskStatus'})
     <v-autocomplete
         :model-value="task.status"
         :items="statusItems"
+        :style="{ color: statusTextColor }"
         density="compact"
-        variant="plain"
+        variant="outlined"
         hide-details
         hide-selected
         placeholder="Статус"
@@ -54,6 +57,8 @@ defineOptions({name:'TaskStatus'})
 <style lang="scss">
 .status-cell .v-autocomplete__selection-text {
   border-radius: 6px;
-  color: #fff;
+}
+.status-cell .v-field__input {
+  color: inherit;
 }
 </style>

@@ -3,16 +3,16 @@ import { ref, onMounted, onBeforeUnmount } from "vue";
 import { useAppStore } from "./store";
 import FilterBar from "./components/filter/FilterBar.vue";
 import TaskTable from "./components/task/TaskTable.vue";
-import TaskFormModal from "./components/TaskFormModal.vue";
+import TaskModal from "./components/taskModal/TaskModal.vue";
 import SettingsModal from "./components/settings/SettingsModal.vue";
 import ReportModal from "./components/ReportModal.vue";
 import StatsModal from "./components/StatsModal.vue";
 import ImportExportModal from "./components/ImportExportModal.vue";
 import ConfirmDeleteModal from "./components/ConfirmDeleteModal.vue";
+import HeaderLayout from "./components/header/HeaderLayout.vue";
 
 const store = useAppStore();
 const editing = ref(null);
-const showSettings = ref(false);
 const showReport = ref(false);
 const showStats = ref(false);
 const showImportExport = ref(false);
@@ -29,7 +29,7 @@ function focusSearch() {
 
 async function newTask() {
   if (!store.settings.username) {
-    showSettings.value = true;
+    store.showSettings = true;
     return;
   }
   editing.value = {
@@ -40,6 +40,7 @@ async function newTask() {
     client: "",
     comment: "",
     customStatus: "",
+    ourCar: false,
   };
 }
 
@@ -53,6 +54,7 @@ function editTask(task) {
     client: task.client,
     comment: task.comment,
     customStatus: task.status || "",
+    ourCar: task.ourCar || false,
     start: task.start || "",
     end: task.end || "",
     intervalsCount: task.intervalsCount || 1,
@@ -68,6 +70,7 @@ async function onSaveTask(draft) {
     client: draft.client,
     comment: draft.comment,
     customStatus: draft.customStatus || "",
+    ourCar: draft.ourCar || false,
   };
   let id = draft.taskId;
   if (draft.mode === "new") {
@@ -96,9 +99,6 @@ async function onConfirmDelete() {
   if (ids?.length) await store.removeTasks(ids);
 }
 
-function onGroupingChange(value) {
-  store.applySettings(store.settings.username, value);
-}
 
 function onKeydown(e) {
   const tag = (e.target.tagName || "").toLowerCase();
@@ -140,51 +140,9 @@ onBeforeUnmount(() => {
 
 <template>
   <v-app>
-    <v-container fluid class="border-b py-0 px-4 d-flex justify-center align-center ga-4">
-      <template #prepend>
-
-      </template>
-      <v-sheet min-width="150px"><v-btn icon="systemIcons:iconTimer" variant="text" aria-label="Time Tracker" />Time Tracker</v-sheet>
-
-
-
-      <v-autocomplete
-        :model-value="store.settings.grouping"
-        :items="[
-          { title: 'Нет', value: 'none' },
-          { title: 'По дням', value: 'day' },
-          { title: 'По клиентам', value: 'client' },
-        ]"
-        label="Группировка"
-        variant="solo"
-        density="compact"
-        hide-details
-        min-width="150px"
-        @update:model-value="onGroupingChange"
-      />
-
-      <v-text-field
-        ref="searchRef"
-        v-model="store.filter.search"
-        placeholder="Поиск (ID, заявка, комментарий…)"
-        variant="solo"
-        density="compact"
-        hide-details
-        clearable
-        min-width="150px"
-        prepend-inner-icon="systemIcons:iconSearch"
-        @keydown.enter="store.refreshQuery()"
-        @click:clear="store.refreshQuery()"
-      />
-      <v-btn variant="tonal" height="90%" density="compact" @click="store.refreshQuery()">Найти</v-btn>
-      <v-spacer />
-      <v-btn color="primary" height="90%" variant="flat" density="compact" prepend-icon="systemIcons:iconPlus" @click="newTask">
-        Новая задача
-      </v-btn>
-      <v-btn variant="tonal" height="90%" density="compact" prepend-icon="systemIcons:iconCog" @click="showSettings = true">
-        Настройки
-      </v-btn>
-    </v-container>
+     <header-layout
+      @new-task="newTask"
+     />
 
     <v-main class="pa-4 d-flex flex-column">
       <v-alert v-if="store.error" max-height="100px" type="error" density="compact" class="mb-3" closable @click:close="store.error = ''">
@@ -224,8 +182,8 @@ onBeforeUnmount(() => {
       </div>
     </v-main>
 
-    <TaskFormModal v-if="editing" :draft="editing" @save="onSaveTask" @close="editing = null" />
-    <SettingsModal v-if="showSettings" @close="showSettings = false" />
+    <TaskModal v-if="editing" :draft="editing" @save="onSaveTask" @close="editing = null" />
+    <SettingsModal v-if="store.showSettings" @close="store.showSettings = false" />
     <ReportModal v-if="showReport" @close="showReport = false" />
     <StatsModal v-if="showStats" @close="showStats = false" />
     <ImportExportModal v-if="showImportExport" @close="showImportExport = false" />

@@ -13,4 +13,13 @@ export default createVuetify({
       systemIcons,
     },
   },
+  theme: {
+    themes: {
+      light: {
+        colors: {
+          primary: "#4caf50",
+        },
+      },
+    },
+  },
 });

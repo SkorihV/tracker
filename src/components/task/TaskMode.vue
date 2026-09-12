@@ -21,7 +21,7 @@ defineOptions({name:'TaskMode'})
 </script>
 
 <template>
-  <v-chip :color="statusMeta[task.mode]?.color || 'secondary'" size="small" variant="tonal">
+  <v-chip border :color="statusMeta[task.mode]?.color || 'secondary'" size="large" variant="tonal">
     <template #prepend>
       <v-icon :icon="statusMeta[task.mode]?.icon || 'systemIcons:iconStop'" start />
     </template>

@@ -11,6 +11,16 @@ use crate::dt::{fmt_td, now_naive, parse_date};
 use crate::logic::{TaskFilter, TotalLine};
 use crate::models::Task;
 
+/// Распарсить "#rrggbb" или "#rrggbbaa" в u32 (0xRRGGBBAA). Err — для RGB белый.
+fn accent_u32(s: &str) -> u32 {
+    let t = s.trim().strip_prefix('#').unwrap_or(s.trim());
+    if t.len() >= 6 && t[..6].chars().all(|c| c.is_ascii_hexdigit()) {
+        u32::from_str_radix(&t[..6], 16).unwrap_or(0xFFFFFFFF)
+    } else {
+        0xFFFFFFFF
+    }
+}
+
 // ---------------------------------------------------------------------
 // Предпросмотр отчёта
 // ---------------------------------------------------------------------
@@ -325,6 +335,7 @@ pub fn write_report(
     filter: &TaskFilter,
     date_from: &str,
     date_to: &str,
+    accent_color: &str,
 ) -> Result<PathBuf, String> {
     let now = now_naive();
     let list = filtered_tasks(tasks, filter);
@@ -366,7 +377,7 @@ pub fn write_report(
             write_cp1251(&path, &body)?;
         }
         "xlsx" => {
-            write_report_xlsx(&path, &list, secs, &tag_map, date_from, date_to)?;
+            write_report_xlsx(&path, &list, secs, &tag_map, date_from, date_to, accent_color)?;
         }
         _ => return Err(format!("Неизвестный формат: {format}")),
     }
@@ -381,6 +392,7 @@ pub fn write_stats(
     filter: &TaskFilter,
     date_from: &str,
     date_to: &str,
+    accent_color: &str,
 ) -> Result<PathBuf, String> {
     let st = statistics(tasks, filter);
     if st.count == 0 {
@@ -435,7 +447,7 @@ pub fn write_stats(
             write_cp1251(&path, &body)?;
         }
         "xlsx" => {
-            write_stats_xlsx(&path, &st, date_from, date_to)?;
+            write_stats_xlsx(&path, &st, date_from, date_to, accent_color)?;
         }
         _ => return Err(format!("Неизвестный формат: {format}")),
     }
@@ -538,11 +550,11 @@ fn write_cp1251(path: &Path, body: &str) -> Result<(), String> {
     std::fs::write(path, bytes).map_err(|e| e.to_string())
 }
 
-fn header_format() -> rust_xlsxwriter::Format {
+fn header_format(accent: u32) -> rust_xlsxwriter::Format {
     rust_xlsxwriter::Format::new()
         .set_bold()
         .set_font_color(rust_xlsxwriter::Color::White)
-        .set_background_color(rust_xlsxwriter::Color::RGB(0x2196F3))
+        .set_background_color(rust_xlsxwriter::Color::RGB(accent))
         .set_align(rust_xlsxwriter::FormatAlign::Center)
         .set_align(rust_xlsxwriter::FormatAlign::VerticalCenter)
         .set_border(rust_xlsxwriter::FormatBorder::Thin)
@@ -555,6 +567,7 @@ fn write_report_xlsx(
     tag_map: &HashMap<String, f64>,
     date_from: &str,
     date_to: &str,
+    accent_color: &str,
 ) -> Result<(), String> {
     use rust_xlsxwriter::Workbook;
 
@@ -562,7 +575,7 @@ fn write_report_xlsx(
     let ws = wb.add_worksheet();
     ws.set_name("Отчёт").map_err(|e| e.to_string())?;
 
-    let header = header_format();
+    let header = header_format(accent_u32(accent_color));
     let mut row = 0u32;
     ws.write_string_with_format(row, 0, "ОТЧЁТ ПО ВРЕМЕНИ", &header).map_err(err)?;
     row += 1;
@@ -675,14 +688,14 @@ fn stats_md(st: &Stats, date_from: &str, date_to: &str) -> String {
     lines.join("\n")
 }
 
-fn write_stats_xlsx(path: &Path, st: &Stats, date_from: &str, date_to: &str) -> Result<(), String> {
+fn write_stats_xlsx(path: &Path, st: &Stats, date_from: &str, date_to: &str, accent_color: &str) -> Result<(), String> {
     use rust_xlsxwriter::Workbook;
 
     let mut wb = Workbook::new();
     let ws = wb.add_worksheet();
     ws.set_name("Статистика").map_err(e2s)?;
 
-    let header = header_format();
+    let header = header_format(accent_u32(accent_color));
     let mut row = 0u32;
     ws.write_string_with_format(row, 0, "СТАТИСТИКА", &header).map_err(e2s)?;
     row += 1;

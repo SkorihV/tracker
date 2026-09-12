@@ -94,8 +94,14 @@ export const api = {
   /** Удалить задачи по ID. */
   removeTasks: (ids) => call("remove_tasks", { ids }),
 
-  /** Сохранить настройки: имя пользователя и режим группировки. */
-  setSettings: (username, grouping) => call("set_settings", { username, grouping }),
+  /** Сохранить настройки: имя пользователя, режим группировки, акцентный цвет. */
+  setSettings: (username, grouping, accentColor) => call("set_settings", { username, grouping, accentColor }),
+  /** Сохранить цвет ячейки «Наша машина». */
+  setOurCarColor: (color) => call("set_our_car_color", { color }),
+  /** Сохранить вид и размер шрифта таблицы задач. */
+  setTableFont: (family, size) => call("set_table_font", { family, size }),
+  /** Сохранить порядок и видимость колонок таблицы. */
+  setColumns: (columns) => call("set_columns", { columns }),
 
   /** Добавить пользователя в справочник. */
   addUser: (name) => call("add_user", { name }),

@@ -2,6 +2,7 @@
 import { ref, watch, computed } from "vue";
 import { api } from "../api";
 import { useAppStore } from "../store";
+import { dateRule } from "../dateRules.js";
 
 const store = useAppStore();
 const emit = defineEmits(["close"]);
@@ -92,8 +93,8 @@ loadStats();
           <v-text-field
             v-model="dateFrom"
             label="Дата с (дд.мм.гггг)"
-            mask="##.##.####"
-            return-masked-value
+            v-maska="'##.##.####'"
+            :rules="[dateRule]"
             density="compact"
             variant="outlined"
             hide-details
@@ -102,8 +103,8 @@ loadStats();
           <v-text-field
             v-model="dateTo"
             label="Дата по (дд.мм.гггг)"
-            mask="##.##.####"
-            return-masked-value
+            v-maska="'##.##.####'"
+            :rules="[dateRule]"
             density="compact"
             variant="outlined"
             hide-details
@@ -142,7 +143,7 @@ loadStats();
 
           <div v-for="sec in sections" :key="sec.title" class="mb-4">
             <h3 class="text-subtitle-2 mb-1">{{ sec.title }}</h3>
-            <v-table v-if="sec.items.length" density="compact">
+            <v-table v-if="sec.items.length" density="compact" class="max-width-table">
               <thead>
                 <tr>
                   <th>Имя</th>

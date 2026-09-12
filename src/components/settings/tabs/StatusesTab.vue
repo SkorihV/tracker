@@ -139,14 +139,14 @@ function move(index, step) {
 
             <v-text-field
                 v-if="editingKey === item.id"
-              v-model="editName"
-              density="compact"
-              variant="outlined"
-              hide-details
-              class="flex-grow-1"
-              @keydown.enter="saveEdit(item)"
-              @keydown.esc="cancelEdit"
-            />
+                v-model="editName"
+                density="compact"
+                variant="outlined"
+                hide-details
+                class="flex-grow-1"
+                @keydown.enter="saveEdit(item)"
+                @keydown.esc="cancelEdit"
+              />
             <span v-else class="flex-grow-1 text-truncate px-2">{{ nameOf(item) }}</span>
             <template v-if="editingKey === item.id">
               <v-btn icon aria-label="Сохранить" variant="text" size="small" @click="saveEdit(item)">

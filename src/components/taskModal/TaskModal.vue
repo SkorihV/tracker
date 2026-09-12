@@ -1,7 +1,8 @@
 <script setup>
 import { reactive, computed, ref } from "vue";
-import { useAppStore } from "../store";
-import RangesModal from "./RangesModal.vue";
+import { useAppStore } from "../../store.js";
+import RangesModal from "../RangesModal.vue";
+import { dateTimeRule, isDateTimeValid } from "../../dateRules.js";
 
 const store = useAppStore();
 
@@ -10,8 +11,6 @@ const props = defineProps({
 });
 
 const emit = defineEmits(["save", "close"]);
-
-const DT_RE = /^\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}$/;
 
 function nowLabel() {
   const d = new Date();
@@ -28,6 +27,7 @@ const form = reactive({
   order: props.draft.order || "",
   tags: props.draft.tags || [],
   customStatus: props.draft.customStatus || "",
+  ourCar: props.draft.ourCar || false,
   client: props.draft.client || "",
   comment: props.draft.comment || "",
   start: props.draft.start || (isEdit ? "" : nowLabel()),
@@ -60,11 +60,11 @@ const open = computed({
 function submit() {
   let datesDirty = false;
   if (form.start !== baseStart.value) {
-    if (DT_RE.test(form.start || "")) datesDirty = true;
+    if (isDateTimeValid(form.start || "")) datesDirty = true;
     else form.start = baseStart.value;
   }
   if (form.end !== baseEnd.value) {
-    if (!form.end || form.end === "" || DT_RE.test(form.end)) datesDirty = true;
+    if (!form.end || form.end === "" || isDateTimeValid(form.end || "")) datesDirty = true;
     else form.end = baseEnd.value;
   }
   emit("save", {
@@ -78,6 +78,12 @@ function submit() {
 function onClose() {
   submit();
 }
+
+const statusColor = computed(() => {
+  return store.statuses.filter(s => {
+    return form.customStatus === s.name
+  })[0]?.color ?? null
+})
 
 function onRangesSave(lines) {
   rangesLines.value = lines;
@@ -111,15 +117,6 @@ function onRangesSave(lines) {
       </v-toolbar>
       <v-card-text class="pt-5">
         <div v-if="isEdit" class="d-flex ga-4 mb-3">
-          <v-text-field
-            :model-value="form.taskId"
-            label="ID"
-            density="compact"
-            variant="outlined"
-            readonly
-            class="mono"
-            style="max-width: 220px"
-          />
           <v-autocomplete
             v-model="form.user"
             :items="store.users.map((u) => ({ title: u, value: u }))"
@@ -146,6 +143,7 @@ function onRangesSave(lines) {
           placeholder="например 12345"
           density="compact"
           variant="outlined"
+          prepend-inner-icon="mdi-clipboard-text-outline"
           class="mb-3"
         />
         <div class="d-flex ga-4 mb-3">
@@ -158,6 +156,7 @@ function onRangesSave(lines) {
             clearable
             multiple
             chips
+            prepend-inner-icon="mdi-tag-outline"
             class="flex-grow-1"
           />
           <v-autocomplete
@@ -167,9 +166,19 @@ function onRangesSave(lines) {
             density="compact"
             variant="outlined"
             clearable
+            prepend-inner-icon="systemIcons:iconClient"
             class="flex-grow-1"
           />
         </div>
+        <div class="d-flex ga-4">
+          <v-sheet
+              class="rounded-circle"
+              width="40px"
+              height="40px"
+
+            :color="statusColor"
+          >
+          </v-sheet>
         <v-autocomplete
           v-model="form.customStatus"
           :items="store.statuses.map((s) => ({ title: s.name, value: s.name }))"
@@ -177,28 +186,44 @@ function onRangesSave(lines) {
           density="compact"
           variant="outlined"
           clearable
+          prepend-inner-icon="mdi-flag-outline"
           class="mb-3"
         />
+          <div>
+          <v-checkbox
+            v-model="form.ourCar"
+            label="Наша машина"
+            density="compact"
+            hide-details
+
+            color="primary"
+          />
+          </div>
+        </div>
         <div class="d-flex ga-4 mb-3">
           <v-text-field
             v-model="form.start"
             label="Начало"
-            placeholder="дд.мм.гггг чч:мм"
+            width="50%"
+            placeholder="дд.мм.гггг мм:чч"
+            v-maska="'##.##.#### ##:##'"
+            :rules="[dateTimeRule]"
             density="compact"
             variant="outlined"
-            mask="##.##.#### ##:##"
-            return-masked-value
+            prepend-inner-icon="mdi-clock-start"
             class="flex-grow-1"
           />
           <v-text-field
             v-model="form.end"
             label="Завершение"
-            placeholder="дд.мм.гггг чч:мм"
+            width="50%"
+            placeholder="дд.мм.гггг мм:чч"
+            v-maska="'##.##.#### ##:##'"
+            :rules="[dateTimeRule]"
             density="compact"
             variant="outlined"
-            mask="##.##.#### ##:##"
-            return-masked-value
             clearable
+            prepend-inner-icon="mdi-clock-end"
             class="flex-grow-1"
           />
         </div>
@@ -218,6 +243,7 @@ function onRangesSave(lines) {
           rows="3"
           density="compact"
           variant="outlined"
+          prepend-inner-icon="mdi-comment-outline"
         />
       </v-card-text>
       <v-card-actions>

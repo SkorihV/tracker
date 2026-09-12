@@ -52,6 +52,11 @@ body,
   user-select: none;
 }
 
+.max-width-table .v-table__wrapper > table {
+  width: max-content;
+  min-width: 100%;
+}
+
 body.modal-no-select {
   user-select: none;
 }

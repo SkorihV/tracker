@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 use crate::dt::{now_naive, parse_dt};
 use crate::logic::{build_rows, build_totals, apply_filter, TaskFilter, TaskIdGen, Totals, ViewRow};
-use crate::models::{AppState, AppTask, Entity, Interval, Settings, StatusDef, Task, TaskDraft, TaskStatus};
+use crate::models::{AppState, AppTask, ColumnPref, Entity, Interval, Settings, StatusDef, Task, TaskDraft, TaskStatus};
 
 #[derive(Debug)]
 pub struct Store {
@@ -188,6 +188,7 @@ impl Store {
             status: crate::models::TaskStatus::Running,
             custom_status: String::new(),
             comment: String::new(),
+            our_car: false,
             intervals: vec![crate::models::Interval {
                 start: now,
                 stop: None,
@@ -826,10 +827,14 @@ pub fn import_json_file(
 // Настройки
 // -----------------------------------------------------------------
 
-    pub fn set_settings(&mut self, username: String, grouping: String) {
+    pub fn set_settings(&mut self, username: String, grouping: String, accent_color: String) {
         self.settings.username = username.trim().to_string();
         if ["none", "day", "client"].contains(&grouping.as_str()) {
             self.settings.grouping = grouping;
+        }
+        let accent = accent_color.trim().to_string();
+        if let Some(hex) = normalize_hex(&accent) {
+            self.settings.accent_color = hex;
         }
         let name = self.settings.username.clone();
         if !name.is_empty() {
@@ -837,11 +842,49 @@ pub fn import_json_file(
         }
         self.save();
     }
+
+    /// Сохранить цвет ячейки «Наша машина».
+    pub fn set_our_car_color(&mut self, color: String) {
+        let color = color.trim().to_string();
+        if let Some(hex) = normalize_hex(&color) {
+            self.settings.our_car_color = hex;
+        }
+        self.save();
+    }
+
+    /// Сохранить вид и размер шрифта таблицы задач.
+    pub fn set_table_font(&mut self, family: String, size: u32) {
+        let family = family.trim().to_string();
+        if !family.is_empty() && family.chars().count() <= 80 {
+            self.settings.font_family = family;
+        }
+        if (8..=40).contains(&size) {
+            self.settings.font_size = size;
+        }
+        self.save();
+    }
+
+    /// Сохранить порядок и видимость колонок таблицы.
+    pub fn set_columns(&mut self, columns: Vec<ColumnPref>) {
+        self.settings.columns = columns;
+        self.save();
+    }
 }
 
 // -----------------------------------------------------------------
 // Пути (вычисление снаружи)
 // -----------------------------------------------------------------
+
+/// Нормализовать цвет из настроек в "#rrggbb" (или None, если некорректен).
+fn normalize_hex(s: &str) -> Option<String> {
+    let t = s.trim();
+    let digits = t.strip_prefix('#').unwrap_or(t);
+    if digits.len() == 6 && digits.chars().all(|c| c.is_ascii_hexdigit()) {
+        Some(format!("#{}", digits.to_ascii_lowercase()))
+    } else {
+        None
+    }
+}
 
 /// Переместить элемент с индексом `from` на индекс `to`; `false`, если границы неверны.
 fn shift_vec<T>(v: &mut Vec<T>, from: usize, to: usize) -> bool {
