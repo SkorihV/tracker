@@ -364,11 +364,16 @@ pub struct AppTask {
     pub tags: Vec<String>,
     pub client: String,
     pub comment: String,
+    #[serde(rename = "mode")]
     pub status: String,
+    #[serde(rename = "status")]
     pub custom_status: String,
     pub seconds: f64,
+    #[serde(rename = "time")]
     pub time_label: String,
+    #[serde(rename = "start")]
     pub start_label: String,
+    #[serde(rename = "end")]
     pub end_label: Option<String>,
     pub intervals_count: usize,
     pub ranges: Vec<AppInterval>,

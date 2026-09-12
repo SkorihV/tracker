@@ -184,8 +184,20 @@ fn remove_user(s: State<'_, AppStore>, name: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn clear_users(s: State<'_, AppStore>) -> Result<(), String> {
+    s.0.lock().map_err(|e| e.to_string())?.clear_users();
+    Ok(())
+}
+
+#[tauri::command]
 fn rename_user(s: State<'_, AppStore>, old: String, new: String) -> Result<(), String> {
     s.0.lock().map_err(|e| e.to_string())?.rename_user(&old, &new);
+    Ok(())
+}
+
+#[tauri::command]
+fn move_user(s: State<'_, AppStore>, from: usize, to: usize) -> Result<(), String> {
+    s.0.lock().map_err(|e| e.to_string())?.move_user(from, to);
     Ok(())
 }
 
@@ -202,8 +214,20 @@ fn remove_tag(s: State<'_, AppStore>, id: u64) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn clear_tags(s: State<'_, AppStore>) -> Result<(), String> {
+    s.0.lock().map_err(|e| e.to_string())?.clear_tags();
+    Ok(())
+}
+
+#[tauri::command]
 fn rename_tag(s: State<'_, AppStore>, old: String, new: String) -> Result<(), String> {
     s.0.lock().map_err(|e| e.to_string())?.rename_tag(&old, &new);
+    Ok(())
+}
+
+#[tauri::command]
+fn move_tag(s: State<'_, AppStore>, from: usize, to: usize) -> Result<(), String> {
+    s.0.lock().map_err(|e| e.to_string())?.move_tag(from, to);
     Ok(())
 }
 
@@ -220,8 +244,20 @@ fn remove_client(s: State<'_, AppStore>, id: u64) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn clear_clients(s: State<'_, AppStore>) -> Result<(), String> {
+    s.0.lock().map_err(|e| e.to_string())?.clear_clients();
+    Ok(())
+}
+
+#[tauri::command]
 fn rename_client(s: State<'_, AppStore>, old: String, new: String) -> Result<(), String> {
     s.0.lock().map_err(|e| e.to_string())?.rename_client(&old, &new);
+    Ok(())
+}
+
+#[tauri::command]
+fn move_client(s: State<'_, AppStore>, from: usize, to: usize) -> Result<(), String> {
+    s.0.lock().map_err(|e| e.to_string())?.move_client(from, to);
     Ok(())
 }
 
@@ -240,6 +276,12 @@ fn remove_status(s: State<'_, AppStore>, id: u64) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn clear_statuses(s: State<'_, AppStore>) -> Result<(), String> {
+    s.0.lock().map_err(|e| e.to_string())?.clear_statuses();
+    Ok(())
+}
+
+#[tauri::command]
 fn rename_status(s: State<'_, AppStore>, old: String, new: String) -> Result<(), String> {
     s.0.lock().map_err(|e| e.to_string())?.rename_status(&old, &new);
     Ok(())
@@ -248,6 +290,12 @@ fn rename_status(s: State<'_, AppStore>, old: String, new: String) -> Result<(),
 #[tauri::command]
 fn set_status_color(s: State<'_, AppStore>, id: u64, color: String) -> Result<(), String> {
     s.0.lock().map_err(|e| e.to_string())?.set_status_color(id, color);
+    Ok(())
+}
+
+#[tauri::command]
+fn move_status(s: State<'_, AppStore>, from: usize, to: usize) -> Result<(), String> {
+    s.0.lock().map_err(|e| e.to_string())?.move_status(from, to);
     Ok(())
 }
 
@@ -304,17 +352,25 @@ pub fn run() {
             set_settings,
             add_user,
             remove_user,
+            clear_users,
             rename_user,
+            move_user,
             add_tag,
             remove_tag,
+            clear_tags,
             rename_tag,
+            move_tag,
             add_client,
             remove_client,
+            clear_clients,
             rename_client,
+            move_client,
             add_status,
             remove_status,
+            clear_statuses,
             rename_status,
-            set_status_color
+            set_status_color,
+            move_status
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

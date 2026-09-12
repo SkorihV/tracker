@@ -5,19 +5,20 @@ const COLUMNS_KEY = "tt.columns";
 
 function defaultColumns() {
   return [
-    { key: "mode", label: "Режим", visible: true },
-    { key: "status", label: "Статус", visible: true },
-    { key: "id", label: "ID", visible: true },
-    { key: "order", label: "Заявка", visible: true },
-    { key: "client", label: "Клиент", visible: true },
-    { key: "tag", label: "Тег", visible: true },
-    { key: "start", label: "Начало", visible: true },
-    { key: "end", label: "Завершение", visible: true },
-    { key: "time", label: "Время", visible: true },
-    { key: "user", label: "Пользователь", visible: true },
-    { key: "comment", label: "Комментарий", visible: true },
-    { key: "actions", label: "Действия", visible: true },
-  ];
+    { key: "time", label: "Время", visible: true, width: '100px' },
+    { key: "status", label: "Статус", visible: true, width: '' },
+    { key: "actions", label: "Действия", visible: true, width: '' },
+    { key: "mode", label: "Режим", visible: true, width: '' },
+    { key: "order", label: "Заявка", visible: true, width: '' },
+    { key: "client", label: "Клиент", visible: true, width: '' },
+    { key: "tags", label: "Тег", visible: true, width: '' },
+    { key: "start", label: "Начало", visible: true, width: '180px' },
+    { key: "end", label: "Завершение", visible: true, width: '180px' },
+
+    { key: "user", label: "Пользователь", visible: true, width: '' },
+    { key: "comment", label: "Комментарий", visible: true, width: '' },
+    { key: "taskId", label: "ID", visible: true, width: '' },
+  ]
 }
 
 function loadColumns() {
@@ -35,7 +36,9 @@ function loadColumns() {
   for (const s of stored) {
     // Миграция: в старых версиях key "status" означал «Режим» (running/пауза),
     // новая колонка «Статус» получает отдельный key "status".
-    const key = s?.key === "status" ? "mode" : s?.key;
+    let key = s?.key === "status" ? "mode" : s?.key;
+    // "tag" переименован в "tags" (совпадение с полем строки для сортировки).
+    if (key === "tag") key = "tags";
     const d = byKey.get(key);
     if (d && !used.has(key)) {
       used.add(key);
@@ -74,6 +77,10 @@ export const useAppStore = defineStore("app", {
     columns: loadColumns(),
   }),
 
+  getters: {
+    visibleColumns: (state) => state.columns.filter((c) => c.visible)
+  },
+
   actions: {
     async init() {
       await this.refresh();
@@ -97,9 +104,11 @@ export const useAppStore = defineStore("app", {
     async refreshQuery() {
       try {
         const q = await api.query(this.filter);
-        this.rows = q.rows;
-        this.totals = q.totals;
-        this.error = "";
+        this.rows = q.rows.map(it => {
+          return {...it, actions: null, group: null}
+        })
+        this.totals = q.totals
+        this.error = ""
       } catch (e) {
         this.error = String(e);
       }
@@ -176,19 +185,27 @@ export const useAppStore = defineStore("app", {
         if (payload.action === "add") await api.addUser(payload.name);
         else if (payload.action === "rename") await api.renameUser(payload.old, payload.name);
         else if (payload.action === "remove") await api.removeUser(payload.name);
+        else if (payload.action === "move") await api.moveUser(payload.from, payload.to);
+        else if (payload.action === "clear") await api.clearUsers();
       } else if (kind === "tag") {
         if (payload.action === "add") await api.addTag(payload.name);
         else if (payload.action === "rename") await api.renameTag(payload.old, payload.name);
         else if (payload.action === "remove") await api.removeTag(payload.id);
+        else if (payload.action === "move") await api.moveTag(payload.from, payload.to);
+        else if (payload.action === "clear") await api.clearTags();
       } else if (kind === "client") {
         if (payload.action === "add") await api.addClient(payload.name);
         else if (payload.action === "rename") await api.renameClient(payload.old, payload.name);
         else if (payload.action === "remove") await api.removeClient(payload.id);
+        else if (payload.action === "move") await api.moveClient(payload.from, payload.to);
+        else if (payload.action === "clear") await api.clearClients();
       } else if (kind === "status") {
         if (payload.action === "add") await api.addStatus(payload.name, payload.color || "default");
         else if (payload.action === "rename") await api.renameStatus(payload.old, payload.name);
         else if (payload.action === "remove") await api.removeStatus(payload.id);
         else if (payload.action === "color") await api.setStatusColor(payload.id, payload.color);
+        else if (payload.action === "move") await api.moveStatus(payload.from, payload.to);
+        else if (payload.action === "clear") await api.clearStatuses();
       }
       await this.refresh();
       await this.refreshQuery();
@@ -200,6 +217,25 @@ export const useAppStore = defineStore("app", {
       } catch {
         /* ignore */
       }
+    },
+
+    /** Вернуть колонки к порядку по умолчанию (видимость сохраняется). */
+    resetColumns() {
+      const byKey = new Map(this.columns.map((c) => [c.key, c]));
+      const out = [];
+      const used = new Set();
+      for (const d of defaultColumns()) {
+        used.add(d.key);
+        out.push(byKey.get(d.key) || { ...d });
+      }
+      for (const c of this.columns) {
+        if (!used.has(c.key)) {
+          used.add(c.key);
+          out.push(c);
+        }
+      }
+      this.columns = out;
+      this.persistColumns();
     },
 
     moveColumn(from, to) {

@@ -102,8 +102,12 @@ function onRangesSave(lines) {
 <template>
   <v-dialog v-model="open" max-width="600" max-height="85vh">
     <v-card class="modal-card">
-      <v-toolbar density="compact" color="primary">
+      <v-toolbar v-dialog-drag density="compact" color="primary">
         <v-toolbar-title>{{ title }}</v-toolbar-title>
+        <v-spacer />
+        <v-btn icon variant="text" title="Закрыть" @click="onClose">
+          <v-icon>mdi-close</v-icon>
+        </v-btn>
       </v-toolbar>
       <v-card-text class="pt-5">
         <div v-if="isEdit" class="d-flex ga-4 mb-3">

@@ -1,5 +1,6 @@
 <script setup>
 import { ref } from "vue";
+import ConfirmDialog from "./ConfirmDialog.vue";
 
 const props = defineProps({
   kind: { type: String, required: true },
@@ -12,6 +13,14 @@ const emit = defineEmits(["action"]);
 const newName = ref("");
 const editingKey = ref(null);
 const editName = ref("");
+const pendingDelete = ref(null);
+const pendingClear = ref(false);
+
+const placeholder = {
+  user: "Новый пользователь…",
+  tag: "Новый тег…",
+  client: "Новый клиент…",
+}[props.kind] || "Новое имя…";
 
 function keyOf(item) {
   return props.kind === "user" ? item : String(item.id);
@@ -45,9 +54,31 @@ function add() {
 }
 
 function remove(item) {
-  const title = props.title;
-  if (!window.confirm(`Удалить «${nameOf(item)}» из ${title.toLowerCase()}?`)) return;
-  emit("action", { action: "remove", id: keyOf(item), name: nameOf(item) });
+  pendingDelete.value = { key: keyOf(item), name: nameOf(item), item };
+}
+
+function confirmRemove() {
+  if (!pendingDelete.value) return;
+  const { key, name, item } = pendingDelete.value;
+  pendingDelete.value = null;
+  // backend remove_user ждёт имя; remove_tag/remove_client — числовой id
+  const id = props.kind === "user" ? key : item.id;
+  emit("action", { action: "remove", id, name });
+}
+
+function clearAll() {
+  pendingClear.value = true;
+}
+
+function confirmClear() {
+  pendingClear.value = false;
+  emit("action", { action: "clear" });
+}
+
+function move(index, step) {
+  const to = index + step;
+  if (to < 0 || to >= props.items.length) return;
+  emit("action", { action: "move", from: index, to });
 }
 </script>
 
@@ -60,7 +91,7 @@ function remove(item) {
       style="max-height: 280px; overflow-y: auto"
     >
       <v-list-item v-if="!items.length" class="text-medium-emphasis text-caption">Нет элементов</v-list-item>
-      <v-list-item v-for="item in items" :key="keyOf(item)" class="px-2">
+      <v-list-item v-for="(item, i) in items" :key="keyOf(item)" class="px-2">
         <template v-if="editingKey === keyOf(item)">
           <div class="d-flex align-center ga-2">
             <v-text-field
@@ -82,6 +113,12 @@ function remove(item) {
         <template v-else>
           <div class="d-flex align-center">
             <span class="flex-grow-1 text-truncate">{{ nameOf(item) }}</span>
+            <v-btn icon aria-label="Вверх" variant="text" size="small" :disabled="i === 0" @click="move(i, -1)">
+              <v-icon>mdi-chevron-up</v-icon>
+            </v-btn>
+            <v-btn icon aria-label="Вниз" variant="text" size="small" :disabled="i === items.length - 1" @click="move(i, 1)">
+              <v-icon>mdi-chevron-down</v-icon>
+            </v-btn>
             <v-btn icon aria-label="Редактировать" variant="text" size="small" @click="startEdit(keyOf(item), nameOf(item))">
               <v-icon icon="systemIcons:iconEdit" />
             </v-btn>
@@ -96,13 +133,31 @@ function remove(item) {
     <div class="d-flex ga-2">
       <v-text-field
         v-model="newName"
-        placeholder="Новое имя…"
+        :placeholder="placeholder"
         density="compact"
         variant="outlined"
         hide-details
         @keydown.enter="add"
       />
       <v-btn variant="tonal" @click="add">Добавить</v-btn>
+      <v-btn variant="tonal" color="error" :disabled="!items.length" @click="clearAll">
+        Удалить все
+      </v-btn>
     </div>
+
+    <ConfirmDialog
+      v-if="pendingDelete"
+      :title="`Удалить «${pendingDelete.name}»?`"
+      :message="`«${pendingDelete.name}» будет удален безвозвратно из ${props.title.toLowerCase()}. Продолжить?`"
+      @confirm="confirmRemove"
+      @close="pendingDelete = null"
+    />
+    <ConfirmDialog
+      v-if="pendingClear"
+      title="Удалить все элементы?"
+      :message="`Все элементы будут удалены безвозвратно из ${props.title.toLowerCase()}. Продолжить?`"
+      @confirm="confirmClear"
+      @close="pendingClear = false"
+    />
   </div>
 </template>

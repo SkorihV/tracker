@@ -95,8 +95,12 @@ const dialogOpen = computed({
 <template>
   <v-dialog v-model="dialogOpen" max-width="560" max-height="85vh">
     <v-card class="modal-card">
-      <v-toolbar density="compact" color="primary">
+      <v-toolbar v-dialog-drag density="compact" color="primary">
         <v-toolbar-title>Экспорт / Импорт</v-toolbar-title>
+        <v-spacer />
+        <v-btn icon variant="text" title="Закрыть" @click="emit('close')">
+          <v-icon>mdi-close</v-icon>
+        </v-btn>
       </v-toolbar>
 
       <v-card-text class="pt-5">

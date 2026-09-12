@@ -49,8 +49,12 @@ function save() {
 <template>
   <v-dialog :model-value="true" width="720" height="65vh">
     <v-card class="modal-card">
-      <v-toolbar density="compact" color="primary">
+      <v-toolbar v-dialog-drag density="compact" color="primary">
         <v-toolbar-title>Временные диапазоны</v-toolbar-title>
+        <v-spacer />
+        <v-btn icon variant="text" title="Закрыть" @click="emit('close')">
+          <v-icon>mdi-close</v-icon>
+        </v-btn>
       </v-toolbar>
       <v-card-text class="pa-4 flex-grow-1 d-flex flex-column">
         <div class="text-caption text-medium-emphasis mb-2">

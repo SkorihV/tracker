@@ -384,6 +384,13 @@ impl Store {
         self.save();
     }
 
+    /// Удалить всех пользователей справочника.
+    pub fn clear_users(&mut self) {
+        self.users.clear();
+        self.settings.username.clear();
+        self.save();
+    }
+
     pub fn rename_user(&mut self, old: &str, new: &str) {
         let new = new.trim();
         if new.is_empty() {
@@ -403,6 +410,12 @@ impl Store {
             }
         }
         self.save();
+    }
+
+    pub fn move_user(&mut self, from: usize, to: usize) {
+        if shift_vec(&mut self.users, from, to) {
+            self.save();
+        }
     }
 
     // -----------------------------------------------------------------
@@ -458,6 +471,18 @@ impl Store {
         self.save();
     }
 
+    /// Удалить все теги справочника.
+    pub fn clear_tags(&mut self) {
+        self.tags.clear();
+        self.save();
+    }
+
+    pub fn move_tag(&mut self, from: usize, to: usize) {
+        if shift_vec(&mut self.tags, from, to) {
+            self.save();
+        }
+    }
+
     // -----------------------------------------------------------------
     // Статусы задачи (справочник «Статус»)
     // -----------------------------------------------------------------
@@ -507,6 +532,21 @@ impl Store {
             }
         }
         self.save();
+    }
+
+    /// Удалить все статусы справочника (у задач статус сбрасывается).
+    pub fn clear_statuses(&mut self) {
+        self.statuses.clear();
+        for t in self.tasks.iter_mut() {
+            t.custom_status.clear();
+        }
+        self.save();
+    }
+
+    pub fn move_status(&mut self, from: usize, to: usize) {
+        if shift_vec(&mut self.statuses, from, to) {
+            self.save();
+        }
     }
 
     pub fn rename_status(&mut self, old: &str, new: &str) {
@@ -568,6 +608,18 @@ impl Store {
     pub fn remove_client(&mut self, id: u64) {
         self.clients.retain(|e| e.id != id);
         self.save();
+    }
+
+    /// Удалить всех клиентов справочника.
+    pub fn clear_clients(&mut self) {
+        self.clients.clear();
+        self.save();
+    }
+
+    pub fn move_client(&mut self, from: usize, to: usize) {
+        if shift_vec(&mut self.clients, from, to) {
+            self.save();
+        }
     }
 
 // -----------------------------------------------------------------
@@ -790,6 +842,16 @@ pub fn import_json_file(
 // -----------------------------------------------------------------
 // Пути (вычисление снаружи)
 // -----------------------------------------------------------------
+
+/// Переместить элемент с индексом `from` на индекс `to`; `false`, если границы неверны.
+fn shift_vec<T>(v: &mut Vec<T>, from: usize, to: usize) -> bool {
+    if from >= v.len() || to >= v.len() || from == to {
+        return false;
+    }
+    let item = v.remove(from);
+    v.insert(to, item);
+    true
+}
 
 pub fn data_file(base_dir: std::path::PathBuf) -> PathBuf {
     base_dir.join("data").join("time_tracker_v2_data.json")

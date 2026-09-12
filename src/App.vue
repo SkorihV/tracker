@@ -8,6 +8,7 @@ import SettingsModal from "./components/settings/SettingsModal.vue";
 import ReportModal from "./components/ReportModal.vue";
 import StatsModal from "./components/StatsModal.vue";
 import ImportExportModal from "./components/ImportExportModal.vue";
+import ConfirmDeleteModal from "./components/ConfirmDeleteModal.vue";
 
 const store = useAppStore();
 const editing = ref(null);
@@ -15,12 +16,10 @@ const showSettings = ref(false);
 const showReport = ref(false);
 const showStats = ref(false);
 const showImportExport = ref(false);
+const confirmDelete = ref(null);
 const searchRef = ref(null);
 const selectedIds = ref(new Set());
 
-function onSelectionChange(set) {
-  selectedIds.value = new Set(set);
-}
 
 function focusSearch() {
   searchRef.value?.focus();
@@ -53,9 +52,9 @@ function editTask(task) {
     tags: task.tags || [],
     client: task.client,
     comment: task.comment,
-    customStatus: task.customStatus || "",
-    start: task.startLabel || "",
-    end: task.endLabel || "",
+    customStatus: task.status || "",
+    start: task.start || "",
+    end: task.end || "",
     intervalsCount: task.intervalsCount || 1,
     ranges: task.ranges || [],
   };
@@ -88,12 +87,13 @@ async function onSaveTask(draft) {
 
 async function onDeleteTasks(ids) {
   if (!ids.length) return;
-  const msg = ids.length === 1
-    ? "Удалить задачу?"
-    : `Удалить выбранные задачи (${ids.length})?`;
-  if (window.confirm(msg)) {
-    await store.removeTasks(ids);
-  }
+  confirmDelete.value = [...ids];
+}
+
+async function onConfirmDelete() {
+  const ids = confirmDelete.value;
+  confirmDelete.value = null;
+  if (ids?.length) await store.removeTasks(ids);
 }
 
 function onGroupingChange(value) {
@@ -187,7 +187,7 @@ onBeforeUnmount(() => {
     </v-container>
 
     <v-main class="pa-4 d-flex flex-column">
-      <v-alert v-if="store.error" type="error" density="compact" class="mb-3" closable @click:close="store.error = ''">
+      <v-alert v-if="store.error" max-height="100px" type="error" density="compact" class="mb-3" closable @click:close="store.error = ''">
         {{ store.error }}
       </v-alert>
 
@@ -195,9 +195,7 @@ onBeforeUnmount(() => {
 
       <TaskTable
         class="flex-grow-1"
-        :rows="store.rows"
-        :selected-ids="selectedIds"
-        @selection-change="onSelectionChange"
+        v-model:selected-ids="selectedIds"
         @edit="editTask"
         @delete="onDeleteTasks"
       />
@@ -231,5 +229,11 @@ onBeforeUnmount(() => {
     <ReportModal v-if="showReport" @close="showReport = false" />
     <StatsModal v-if="showStats" @close="showStats = false" />
     <ImportExportModal v-if="showImportExport" @close="showImportExport = false" />
+    <ConfirmDeleteModal
+      v-if="confirmDelete"
+      :ids="confirmDelete"
+      @confirm="onConfirmDelete"
+      @close="confirmDelete = null"
+    />
   </v-app>
 </template>

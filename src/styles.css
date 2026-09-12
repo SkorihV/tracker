@@ -26,19 +26,9 @@ body,
   cursor: pointer;
 }
 
-.task-table .comment-cell,
-.preview-table .comment-cell {
-  max-width: 260px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 
-.empty {
-  text-align: center;
-  color: #999;
-  padding: 24px 0;
-}
+
+
 
 .modal-card {
   display: flex;
@@ -55,4 +45,13 @@ body,
 .modal-card .v-toolbar,
 .modal-card .v-card-actions {
   flex: 0 0 auto;
+}
+
+.modal-card .v-toolbar {
+  cursor: move;
+  user-select: none;
+}
+
+body.modal-no-select {
+  user-select: none;
 }

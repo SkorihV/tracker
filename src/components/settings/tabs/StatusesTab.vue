@@ -1,6 +1,7 @@
 <script setup>
 import { ref, reactive } from "vue";
 import { statusHex } from "../../../statusColors.js";
+import ConfirmDialog from "../../ConfirmDialog.vue";
 
 const emit = defineEmits(["action"]);
 const props = defineProps({
@@ -12,6 +13,8 @@ const newColor = ref("");
 const newMenu = ref(false);
 const editingKey = ref(null);
 const editName = ref("");
+const pendingDelete = ref(null);
+const pendingClear = ref(false);
 const menus = reactive({});
 const picker = reactive({});
 
@@ -75,8 +78,29 @@ function add() {
 }
 
 function remove(item) {
-  if (!window.confirm(`Удалить статус «${nameOf(item)}»?`)) return;
+  pendingDelete.value = item;
+}
+
+function confirmRemove() {
+  if (!pendingDelete.value) return;
+  const item = pendingDelete.value;
+  pendingDelete.value = null;
   emit("action", { action: "remove", id: item.id });
+}
+
+function clearAll() {
+  pendingClear.value = true;
+}
+
+function confirmClear() {
+  pendingClear.value = false;
+  emit("action", { action: "clear" });
+}
+
+function move(index, step) {
+  const to = index + step;
+  if (to < 0 || to >= props.items.length) return;
+  emit("action", { action: "move", from: index, to });
 }
 </script>
 
@@ -86,7 +110,7 @@ function remove(item) {
       <v-list-item v-if="!items.length" class="text-medium-emphasis text-caption">
         Статус не задан. Добавьте первый (например «Новая», «В работе», «Завершена»).
       </v-list-item>
-      <v-list-item v-for="item in items" :key="item.id" class="px-2">
+      <v-list-item v-for="(item, i) in items" :key="item.id" class="px-2">
           <div class="d-flex align-center ga-2">
             <v-menu v-model="menus[item.id]" :close-on-content-click="false" location="bottom start">
               <template #activator="{ props: menuProps }">
@@ -133,6 +157,12 @@ function remove(item) {
               </v-btn>
             </template>
             <template v-else>
+              <v-btn icon aria-label="Вверх" variant="text" size="small" :disabled="i === 0" @click="move(i, -1)">
+                <v-icon>mdi-chevron-up</v-icon>
+              </v-btn>
+              <v-btn icon aria-label="Вниз" variant="text" size="small" :disabled="i === items.length - 1" @click="move(i, 1)">
+                <v-icon>mdi-chevron-down</v-icon>
+              </v-btn>
               <v-btn icon aria-label="Редактировать" variant="text" size="small" @click="startEdit(item)">
                 <v-icon icon="systemIcons:iconEdit" />
               </v-btn>
@@ -161,7 +191,7 @@ function remove(item) {
             variant="tonal"
             aria-label="Цвет нового статуса"
             :style="swatchStyle(newColor)"
-            @click="picker.new = statusHex(newColor) || '#1E88E5'; newMenu = true"
+            @click="picker.new = '#00000'; newMenu = true"
           />
         </template>
         <v-sheet class="pa-2 d-flex flex-column ga-2">
@@ -177,6 +207,24 @@ function remove(item) {
         </v-sheet>
       </v-menu>
       <v-btn variant="tonal" @click="add">Добавить</v-btn>
+      <v-btn variant="tonal" color="error" :disabled="!items.length" @click="clearAll">
+        Удалить все
+      </v-btn>
     </div>
+
+    <ConfirmDialog
+      v-if="pendingDelete"
+      :title="`Удалить статус «${pendingDelete.name}»?`"
+      :message="`Статус «${pendingDelete.name}» будет удален безвозвратно. Продолжить?`"
+      @confirm="confirmRemove"
+      @close="pendingDelete = null"
+    />
+    <ConfirmDialog
+      v-if="pendingClear"
+      title="Удалить все статусы?"
+      message="Все статусы будут удалены безвозвратно (у задач статус сбросится). Продолжить?"
+      @confirm="confirmClear"
+      @close="pendingClear = false"
+    />
   </div>
 </template>

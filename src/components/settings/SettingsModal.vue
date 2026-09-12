@@ -29,8 +29,12 @@ async function onAction(kind, payload) {
 <template>
   <v-dialog v-model="open" width="960" height="80vh">
     <v-card class="modal-card">
-      <v-toolbar density="compact" color="primary">
+      <v-toolbar v-dialog-drag density="compact" color="primary">
         <v-toolbar-title>Настройки</v-toolbar-title>
+        <v-spacer />
+        <v-btn icon variant="text" title="Закрыть" @click="emit('close')">
+          <v-icon>mdi-close</v-icon>
+        </v-btn>
       </v-toolbar>
 
       <v-card-text class="pt-5">

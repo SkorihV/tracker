@@ -45,4 +45,5 @@ function setVisible(key, visible) {
       </div>
     </v-list-item>
   </v-list>
+  <v-btn variant="tonal" @click="store.resetColumns()">По умолчанию</v-btn>
 </template>
