@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, onBeforeUnmount } from "vue";
+import { onMounted, onBeforeUnmount } from "vue"
 
 defineProps({
   title: { type: String, default: "Подтвердите действие" },
@@ -7,18 +7,18 @@ defineProps({
   confirmText: { type: String, default: "Удалить" },
   color: { type: String, default: "error" },
   maxWidth: { type: Number, default: 420 },
-});
+})
 
-const emit = defineEmits(["confirm", "close"]);
+const emit = defineEmits(["confirm", "close"])
 
 function onKeydown(e) {
-  const tag = (e.target.tagName || "").toLowerCase();
-  if (["input", "textarea", "select", "button"].includes(tag)) return;
-  if (e.key === "Enter" && !e.repeat) emit("confirm");
+  const tag = (e.target.tagName || "").toLowerCase()
+  if (["input", "textarea", "select", "button"].includes(tag)) return
+  if (e.key === "Enter" && !e.repeat) emit("confirm")
 }
 
-onMounted(() => window.addEventListener("keydown", onKeydown));
-onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
+onMounted(() => window.addEventListener("keydown", onKeydown))
+onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown))
 </script>
 
 <template>

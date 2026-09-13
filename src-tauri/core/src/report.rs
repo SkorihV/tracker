@@ -328,6 +328,7 @@ pub fn ts_stamp() -> String {
 }
 
 /// Вернуть путь к сохранённому файлу или Err с текстом ошибки.
+/// Сохраняет в reports/ базового каталога.
 pub fn write_report(
     base: &Path,
     format: &str,
@@ -348,20 +349,57 @@ pub fn write_report(
     let dir = reports_dir(base);
     let ts = ts_stamp();
     let path = dir.join(format!("report_{ts}.{format}"));
+    write_report_body(&path, format, &list, secs, &tag_map, date_from, date_to, accent_color)?;
+    Ok(path)
+}
 
+/// Сохранить отчёт по явно заданному пути (диалог выбора файла).
+pub fn write_report_to(
+    path: &Path,
+    format: &str,
+    tasks: &[Task],
+    filter: &TaskFilter,
+    date_from: &str,
+    date_to: &str,
+    accent_color: &str,
+) -> Result<PathBuf, String> {
+    let now = now_naive();
+    let list = filtered_tasks(tasks, filter);
+    if list.is_empty() {
+        return Err("Нет записей за выбранный период".to_string());
+    }
+    let secs = total_seconds(list.iter().copied(), now);
+    let tag_map = tag_seconds(list.iter().copied(), now);
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    write_report_body(path, format, &list, secs, &tag_map, date_from, date_to, accent_color)?;
+    Ok(path.to_path_buf())
+}
+
+fn write_report_body(
+    path: &Path,
+    format: &str,
+    list: &[&Task],
+    secs: f64,
+    tag_map: &HashMap<String, f64>,
+    date_from: &str,
+    date_to: &str,
+    accent_color: &str,
+) -> Result<(), String> {
     match format {
         "txt" => {
-            let body = report_txt(&list, secs, &tag_map, date_from, date_to, now);
-            std::fs::write(&path, body).map_err(|e| e.to_string())?;
+            let body = report_txt(list, secs, tag_map, date_from, date_to, now_naive());
+            std::fs::write(path, body).map_err(|e| e.to_string())?;
         }
         "md" => {
-            let body = report_md(&list, secs, &tag_map, date_from, date_to);
-            std::fs::write(&path, body).map_err(|e| e.to_string())?;
+            let body = report_md(list, secs, tag_map, date_from, date_to);
+            std::fs::write(path, body).map_err(|e| e.to_string())?;
         }
         "csv" => {
             let mut body = String::new();
             body.push_str("\"Дата начала\",\"Дата окончания\",\"Пользователь\",\"Номер заявки\",\"Клиент\",\"Тег\",\"Время (чч:мм:сс)\",\"Комментарий\",\"Диапазоны\"\r\n");
-            for t in &list {
+            for t in list {
                 body.push_str(&row_csv(&[
                     t.start_str(),
                     t.end_str(),
@@ -369,22 +407,22 @@ pub fn write_report(
                     t.order.clone(),
                     t.client.clone(),
                     t.tags.join(", "),
-                    fmt_td(t.total_seconds(now)),
+                    fmt_td(t.total_seconds(now_naive())),
                     t.comment.clone(),
                     t.ranges_str(),
                 ]));
             }
-            write_cp1251(&path, &body)?;
+            write_cp1251(path, &body)?;
         }
         "xlsx" => {
-            write_report_xlsx(&path, &list, secs, &tag_map, date_from, date_to, accent_color)?;
+            write_report_xlsx(path, list, secs, tag_map, date_from, date_to, accent_color)?;
         }
         _ => return Err(format!("Неизвестный формат: {format}")),
     }
-    Ok(path)
+    Ok(())
 }
 
-/// Путь к файлу статистики или Err.
+/// Путь к файлу статистики или Err. Сохраняет в reports/ базового каталога.
 pub fn write_stats(
     base: &Path,
     format: &str,
@@ -401,15 +439,47 @@ pub fn write_stats(
     let dir = reports_dir(base);
     let ts = ts_stamp();
     let path = dir.join(format!("stats_{ts}.{format}"));
+    write_stats_body(&path, format, &st, date_from, date_to, accent_color)?;
+    Ok(path)
+}
 
+/// Сохранить статистику по явно заданному пути (диалог выбора файла).
+pub fn write_stats_to(
+    path: &Path,
+    format: &str,
+    tasks: &[Task],
+    filter: &TaskFilter,
+    date_from: &str,
+    date_to: &str,
+    accent_color: &str,
+) -> Result<PathBuf, String> {
+    let st = statistics(tasks, filter);
+    if st.count == 0 {
+        return Err("Нет записей за выбранный период".to_string());
+    }
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    write_stats_body(path, format, &st, date_from, date_to, accent_color)?;
+    Ok(path.to_path_buf())
+}
+
+fn write_stats_body(
+    path: &Path,
+    format: &str,
+    st: &Stats,
+    date_from: &str,
+    date_to: &str,
+    accent_color: &str,
+) -> Result<(), String> {
     match format {
         "txt" => {
-            let body = stats_txt(&st, date_from, date_to);
-            std::fs::write(&path, body).map_err(|e| e.to_string())?;
+            let body = stats_txt(st, date_from, date_to);
+            std::fs::write(path, body).map_err(|e| e.to_string())?;
         }
         "md" => {
-            let body = stats_md(&st, date_from, date_to);
-            std::fs::write(&path, body).map_err(|e| e.to_string())?;
+            let body = stats_md(st, date_from, date_to);
+            std::fs::write(path, body).map_err(|e| e.to_string())?;
         }
         "csv" => {
             let mut body = String::new();
@@ -423,7 +493,7 @@ pub fn write_stats(
                 st.total_label.clone(),
             ]));
             body.push_str("\r\n");
-            for (title, items) in stats_sections(&st) {
+            for (title, items) in stats_sections(st) {
                 if items.is_empty() {
                     continue;
                 }
@@ -444,14 +514,14 @@ pub fn write_stats(
                 }
                 body.push_str("\r\n");
             }
-            write_cp1251(&path, &body)?;
+            write_cp1251(path, &body)?;
         }
         "xlsx" => {
-            write_stats_xlsx(&path, &st, date_from, date_to, accent_color)?;
+            write_stats_xlsx(path, st, date_from, date_to, accent_color)?;
         }
         _ => return Err(format!("Неизвестный формат: {format}")),
     }
-    Ok(path)
+    Ok(())
 }
 
 fn fmt_period(date_from: &str, date_to: &str) -> String {

@@ -1,18 +1,18 @@
 <script setup>
-import { useAppStore } from "../../store.js";
-import { dateRule } from "../../dateRules.js";
+import { useAppStore } from "../../store.js"
+import { dateRule } from "../../dateRules.js"
 
-const store = useAppStore();
+const store = useAppStore()
 
 function resetFilters() {
-  store.filter = { dateFrom: "", dateTo: "", tags: [], client: "", user: "", search: "" };
-  store.refreshQuery();
+  store.filter = { dateFrom: "", dateTo: "", tags: [], client: "", user: "", search: "" }
+  store.refreshQuery()
 }
 
 function clearDates() {
-  store.filter.dateFrom = "";
-  store.filter.dateTo = "";
-  store.refreshQuery();
+  store.filter.dateFrom = ""
+  store.filter.dateTo = ""
+  store.refreshQuery()
 }
 </script>
 

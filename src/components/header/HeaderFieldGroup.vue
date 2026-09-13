@@ -1,9 +1,9 @@
 <script setup>
-import {useAppStore} from "../../store.js";
+import {useAppStore} from "../../store.js"
 const store = useAppStore()
 
 function onGroupingChange(value) {
-  store.applySettings(store.settings.username, value);
+  store.applySettings(store.settings.username, value)
 }
 
 defineOptions({name:'HeaderFieldGroup'})

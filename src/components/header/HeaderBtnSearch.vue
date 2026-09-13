@@ -1,5 +1,5 @@
 <script setup>
-import {useAppStore} from "../../store.js";
+import {useAppStore} from "../../store.js"
 
 const store = useAppStore()
 defineOptions({name:'HeaderBtnSearch'})

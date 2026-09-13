@@ -1,78 +1,78 @@
 <script setup>
-import { ref, watch, computed } from "vue";
-import { save } from "@tauri-apps/plugin-dialog";
-import { api } from "../api";
-import { useAppStore } from "../store";
-import { reportFilter } from "../reportFilter";
-import BaseModal from "./BaseModal.vue";
-import ReportPeriodFields from "./ReportPeriodFields.vue";
+import { ref, watch, computed } from "vue"
+import { save } from "@tauri-apps/plugin-dialog"
+import { api } from "../api"
+import { useAppStore } from "../store"
+import { reportFilter } from "../reportFilter"
+import BaseModal from "./BaseModal.vue"
+import ReportPeriodFields from "./ReportPeriodFields.vue"
 
-const store = useAppStore();
-const emit = defineEmits(["close"]);
+const store = useAppStore()
+const emit = defineEmits(["close"])
 
 function firstOfMonth() {
-  const d = new Date();
-  return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
+  const d = new Date()
+  return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`
 }
 
-const dateFrom = ref(store.filter.dateFrom || firstOfMonth());
-const dateTo = ref(store.filter.dateTo || "");
+const dateFrom = ref(store.filter.dateFrom || firstOfMonth())
+const dateTo = ref(store.filter.dateTo || "")
 
-const format = ref("txt");
+const format = ref("txt")
 
-const stats = ref(null);
-const loading = ref(false);
-const error = ref("");
-const saved = ref("");
+const stats = ref(null)
+const loading = ref(false)
+const error = ref("")
+const saved = ref("")
 
 function tsNow() {
-  const d = new Date();
-  const p = (n) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+  const d = new Date()
+  const p = (n) => String(n).padStart(2, "0")
+  return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`
 }
 
 async function loadStats() {
-  loading.value = true;
-  error.value = "";
+  loading.value = true
+  error.value = ""
   try {
-    stats.value = await api.statsPreview(reportFilter(dateFrom.value, dateTo.value, store.filter));
+    stats.value = await api.statsPreview(reportFilter(dateFrom.value, dateTo.value, store.filter))
   } catch (e) {
-    error.value = String(e);
-    stats.value = null;
+    error.value = String(e)
+    stats.value = null
   } finally {
-    loading.value = false;
+    loading.value = false
   }
 }
 
 async function saveStats() {
-  error.value = "";
-  saved.value = "";
+  error.value = ""
+  saved.value = ""
   try {
-    const ext = format.value;
+    const ext = format.value
     const target = await save({
       defaultPath: `stats_${tsNow()}.${ext}`,
       filters: [{ name: ext.toUpperCase(), extensions: [ext] }],
-    });
-    if (!target) return;
-    const path = await api.createStats(ext, reportFilter(dateFrom.value, dateTo.value, store.filter), dateFrom.value, dateTo.value, target);
-    saved.value = path;
+    })
+    if (!target) return
+    const path = await api.createStats(ext, reportFilter(dateFrom.value, dateTo.value, store.filter), dateFrom.value, dateTo.value, target)
+    saved.value = path
   } catch (e) {
-    error.value = String(e);
+    error.value = String(e)
   }
 }
 
 const sections = computed(() => {
-  if (!stats.value) return [];
+  if (!stats.value) return []
   return [
     { title: "По пользователям", items: stats.value.byUser },
     { title: "По клиентам", items: stats.value.byClient },
     { title: "По тегам", items: stats.value.byTag },
     { title: "По месяцам", items: stats.value.byMonth },
-  ];
-});
+  ]
+})
 
-watch([dateFrom, dateTo], () => loadStats());
-loadStats();
+watch([dateFrom, dateTo], () => loadStats())
+loadStats()
 </script>
 
 <template>

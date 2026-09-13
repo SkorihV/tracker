@@ -176,13 +176,14 @@ fn store_mutations() {
     let mut st = Store::open(db.clone());
     let before_n = st.tasks.len();
 
-    let t = st.create_task(TaskDraft {
-        user: "Тест 1".into(),
-        order: "R-1".into(),
+let t = st.create_task(TaskDraft {
+        user: "Второй".into(),
+        order: "R-3".into(),
         tags: vec![],
         client: "".into(),
-        comment: "сквозной тест на Rust".into(),
+        comment: "".into(),
         custom_status: "".into(),
+        our_car: false,
     });
     assert_eq!(st.tasks.len(), before_n + 1);
     assert_eq!(t.status, "running");
@@ -198,7 +199,7 @@ fn store_mutations() {
 
     st.update_task(
         &t.task_id,
-        TaskDraft { user: "Второй".into(), order: "R-2".into(), tags: vec!["Тонкий".into()], client: "Клиент 1".into(), comment: "".into(), custom_status: "".into() },
+        TaskDraft { user: "Второй".into(), order: "R-2".into(), tags: vec!["Тонкий".into()], client: "Клиент 1".into(), comment: "".into(), custom_status: "".into(), our_car: false },
     );
     let last = st.tasks.last().unwrap();
     assert_eq!(last.order, "R-2");
@@ -220,13 +221,15 @@ fn dates_and_intervals() {
     let db = dir.join("data").join("time_tracker_v2_data.json");
     let mut st = Store::open(db.clone());
 
-    let t = st.create_task(TaskDraft {
-        user: "Тест".into(),
-        order: "R-1".into(),
-        tags: vec![],
+let t = st.create_task(TaskDraft {
+        user: "Автодопользователь".into(),
+        order: "R-2".into(),
+        tags: vec![]
+            .into_iter().collect(),
         client: "".into(),
         comment: "".into(),
         custom_status: "".into(),
+        our_car: false,
     });
 
     // Поля редактора «Начало / Завершение» меняют последний диапазон.
@@ -285,14 +288,15 @@ fn dates_and_intervals() {
     )
     .is_err());
 
-    let t2 = st.create_task(TaskDraft {
-        user: "Тест".into(),
-        order: "R-2".into(),
-        tags: vec![],
-        client: "".into(),
-        comment: "".into(),
-        custom_status: "".into(),
-    });
+let t2 = st.create_task(TaskDraft {
+                            user: "Второй".into(),
+                            order: "R-2".into(),
+                            tags: vec![],
+                            client: "".into(),
+                            comment: "".into(),
+                            custom_status: "".into(),
+                            our_car: false,
+                        });
     st.set_task_intervals(
         &t2.task_id,
         vec!["01.01.2026 08:00 — 01.01.2026 09:00".into(), "02.01.2026 08:00 — 09:00".into()],
@@ -325,6 +329,7 @@ fn tags_and_statuses() {
         client: "".into(),
         comment: "".into(),
         custom_status: "Новая".into(),
+        our_car: false,
     });
     // Теги и статус автоматически добавлены в справочники.
     assert!(st.tags.iter().any(|e| e.name == "Альфа"));

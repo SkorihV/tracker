@@ -1,14 +1,14 @@
 <script setup>
-import { ref, reactive } from "vue";
-import { save, open } from "@tauri-apps/plugin-dialog";
-import { api } from "../api";
-import { useAppStore } from "../store";
-import BaseModal from "./BaseModal.vue";
+import { ref, reactive } from "vue"
+import { save, open } from "@tauri-apps/plugin-dialog"
+import { api } from "../api"
+import { useAppStore } from "../store"
+import BaseModal from "./BaseModal.vue"
 
-const store = useAppStore();
-const emit = defineEmits(["close"]);
+const store = useAppStore()
+const emit = defineEmits(["close"])
 
-const tab = ref("export");
+const tab = ref("export")
 
 const exportOpts = reactive({
   filename: "time_tracker_export.json",
@@ -16,7 +16,7 @@ const exportOpts = reactive({
   tags: true,
   clients: true,
   users: true,
-});
+})
 
 const importOpts = reactive({
   path: "",
@@ -24,66 +24,66 @@ const importOpts = reactive({
   tags: true,
   clients: true,
   users: true,
-});
+})
 
-const busy = ref(false);
-const error = ref("");
-const notice = ref("");
+const busy = ref(false)
+const error = ref("")
+const notice = ref("")
 
 async function doExport() {
-  error.value = "";
-  notice.value = "";
-  busy.value = true;
+  error.value = ""
+  notice.value = ""
+  busy.value = true
   try {
     const path = await save({
       defaultPath: exportOpts.filename,
       filters: [{ name: "JSON", extensions: ["json"] }],
-    });
-    if (!path) return;
+    })
+    if (!path) return
     await api.exportJson(path, {
       tasks: exportOpts.tasks,
       tags: exportOpts.tags,
       clients: exportOpts.clients,
       users: exportOpts.users,
-    });
-    notice.value = `Экспортировано: ${path}`;
+    })
+    notice.value = `Экспортировано: ${path}`
   } catch (e) {
-    error.value = String(e);
+    error.value = String(e)
   } finally {
-    busy.value = false;
+    busy.value = false
   }
 }
 
 async function pickFile() {
-  error.value = "";
-  notice.value = "";
+  error.value = ""
+  notice.value = ""
   const path = await open({
     multiple: false,
     directory: false,
     filters: [{ name: "JSON", extensions: ["json"] }],
-  });
-  if (path) importOpts.path = String(path);
+  })
+  if (path) importOpts.path = String(path)
 }
 
 async function doImport() {
-  if (!importOpts.path) return;
-  error.value = "";
-  notice.value = "";
-  busy.value = true;
+  if (!importOpts.path) return
+  error.value = ""
+  notice.value = ""
+  busy.value = true
   try {
     await api.importJson(importOpts.path, {
       tasks: importOpts.tasks,
       tags: importOpts.tags,
       clients: importOpts.clients,
       users: importOpts.users,
-    });
-    await store.refresh();
-    await store.refreshQuery();
-    notice.value = `Импортировано из: ${importOpts.path}`;
+    })
+    await store.refresh()
+    await store.refreshQuery()
+    notice.value = `Импортировано из: ${importOpts.path}`
   } catch (e) {
-    error.value = String(e);
+    error.value = String(e)
   } finally {
-    busy.value = false;
+    busy.value = false
   }
 }
 </script>

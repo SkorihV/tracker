@@ -1,8 +1,8 @@
 <script setup>
-import HeaderFieldGroup from "./HeaderFieldGroup.vue";
-import HeaderBtnSearch from "./HeaderBtnSearch.vue";
-import {useAppStore} from "../../store.js";
-import HeaderFieldSearch from "./HeaderFieldSearch.vue";
+import HeaderFieldGroup from "./HeaderFieldGroup.vue"
+import HeaderBtnSearch from "./HeaderBtnSearch.vue"
+import {useAppStore} from "../../store.js"
+import HeaderFieldSearch from "./HeaderFieldSearch.vue"
 const emits = defineEmits(['newTask'])
 
 const store = useAppStore()

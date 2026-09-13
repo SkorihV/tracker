@@ -18,6 +18,7 @@ import iconStop from './main/iconStop.vue'
 import iconTimer from './main/iconTimer.vue'
 import iconTrash from './main/iconTrash.vue'
 import iconUser from './main/iconUser.vue'
+import iconColor from './main/iconColor.vue'
 
 //Все новые иконки следует добавлять в эту константу
 const mapNameToComponent: any = {
@@ -38,7 +39,8 @@ const mapNameToComponent: any = {
     iconStop,
     iconTimer,
     iconTrash,
-    iconUser
+    iconUser,
+    iconColor
 }
 
 const systemIcons: IconSet = {

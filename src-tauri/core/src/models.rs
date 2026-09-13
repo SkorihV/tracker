@@ -41,6 +41,7 @@ pub struct Settings {
     pub font_family: String, // вид шрифта таблицы задач (CSS font-family)
     pub font_size: u32, // размер шрифта таблицы задач (px)
     pub columns: Vec<ColumnPref>, // порядок и видимость колонок таблицы
+    pub backup_dir: String, // пользовательский каталог бэкапов ("") = по умолчанию
 }
 
 impl Default for Settings {
@@ -53,6 +54,7 @@ impl Default for Settings {
             font_family: "Roboto".into(),
             font_size: 14,
             columns: Vec::new(),
+            backup_dir: String::new(),
         }
     }
 }
@@ -91,6 +93,11 @@ impl Settings {
             .and_then(|x| x.as_array())
             .map(|a| a.iter().filter_map(ColumnPref::from_json).collect())
             .unwrap_or_default();
+        let backup_dir = obj
+            .and_then(|o| o.get("backup_dir"))
+            .and_then(|x| x.as_str())
+            .unwrap_or("")
+            .to_string();
         Settings {
             username: obj
                 .and_then(|o| o.get("username"))
@@ -103,6 +110,7 @@ impl Settings {
             font_family,
             font_size,
             columns,
+            backup_dir,
         }
     }
 
@@ -115,6 +123,7 @@ impl Settings {
             "font_family": self.font_family,
             "font_size": self.font_size,
             "columns": self.columns,
+            "backup_dir": self.backup_dir,
         })
     }
 }

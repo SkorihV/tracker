@@ -1,7 +1,7 @@
 <script setup>
 import {computed, defineProps} from 'vue'
-import {useAppStore} from "../../store.js";
-import {statusHex, statusTextHex} from "../../statusColors.js";
+import {useAppStore} from "../../store.js"
+import {statusHex, statusTextHex} from "../../statusColors.js"
 const store = useAppStore()
 const props = defineProps({
   task: Object
@@ -9,24 +9,24 @@ const props = defineProps({
 
 
 function statusColorOf(row) {
-  const st = store.statuses.find((s) => s.name === row.status);
-  return statusHex(st?.color);
+  const st = store.statuses.find((s) => s.name === row.status)
+  return statusHex(st?.color)
 }
 
 const statusCellStyle = (row) => {
-  const c = statusColorOf(row);
-  return { backgroundColor: c, color: statusTextHex(c) };
-};
+  const c = statusColorOf(row)
+  return { backgroundColor: c, color: statusTextHex(c) }
+}
 
-const statusTextColor = computed(() => statusTextHex(statusColorOf(props.task)));
+const statusTextColor = computed(() => statusTextHex(statusColorOf(props.task)))
 
 async function onChangeStatus(row, value) {
-  if (value === props.task.status) return;
-  await store.updateTaskStatus(row.taskId, value || "");
+  if (value === props.task.status) return
+  await store.updateTaskStatus(row.taskId, value || "")
 }
 const statusItems = computed(() =>
     store.statuses.map((s) => ({ title: s.name, value: s.name }))
-);
+)
 
 defineOptions({name:'TaskStatus'})
 </script>

@@ -1,6 +1,6 @@
 <script setup>
-import {useAppStore} from "../../store.js";
-import {statusHex, statusTextHex} from "../../statusColors.js";
+import {useAppStore} from "../../store.js"
+import {statusHex, statusTextHex} from "../../statusColors.js"
 const props = defineProps({
   task: Object
 })

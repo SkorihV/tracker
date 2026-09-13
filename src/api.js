@@ -1,18 +1,18 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "@tauri-apps/api/core"
 
 async function call(cmd, args) {
   try {
-    return await invoke(cmd, args);
+    return await invoke(cmd, args)
   } catch (e) {
-    console.error(`[${cmd}]`, e);
-    throw e;
+    console.error(`[${cmd}]`, e)
+    throw e
   }
 }
 
 function cleanFilter(f) {
-  const out = {};
-  for (const [k, v] of Object.entries(f)) out[k] = v ?? "";
-  return out;
+  const out = {}
+  for (const [k, v] of Object.entries(f)) out[k] = v ?? ""
+  return out
 }
 
 export const api = {
@@ -21,13 +21,13 @@ export const api = {
 
   /** Выполнить запрос задач по фильтру. Возвращает { rows, totals }. Строки — только заявки (group-строки и поле kind отбрасываются). */
   query: async (filter) => {
-    const res = await call("query", { filter: cleanFilter(filter) });
+    const res = await call("query", { filter: cleanFilter(filter) })
     return {
       ...res,
       rows: (res.rows || [])
         .filter((r) => r.kind !== "group")
         .map(({ kind, ...row }) => row),
-    };
+    }
   },
 
   /** Предпросмотр отчёта (данные на экране, без записи файла). */
@@ -171,12 +171,12 @@ export const api = {
 
   /** Переместить статус в списке (from → to). */
   moveStatus: (from, to) => call("move_status", { from, to }),
-};
+}
 
 export function fmtTd(seconds) {
-  const t = Math.max(0, Math.floor(seconds || 0));
-  const h = Math.floor(t / 3600);
-  const m = Math.floor((t % 3600) / 60);
-  const s = t % 60;
-  return [h, m, s].map((x) => String(x).padStart(2, "0")).join(":");
+  const t = Math.max(0, Math.floor(seconds || 0))
+  const h = Math.floor(t / 3600)
+  const m = Math.floor((t % 3600) / 60)
+  const s = t % 60
+  return [h, m, s].map((x) => String(x).padStart(2, "0")).join(":")
 }

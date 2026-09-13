@@ -1,6 +1,6 @@
 <script setup>
 import {defineProps} from 'vue'
-import {fmtTd} from "../../api.js";
+import {fmtTd} from "../../api.js"
 
 const props = defineProps({
   item: Object,

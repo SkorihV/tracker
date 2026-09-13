@@ -1,19 +1,19 @@
 <script setup>
-import { computed, defineModel } from "vue";
-import { useAppStore } from "../../store.js";
-import TaskActions from "./TaskActions.vue";
-import TaskComment from "./TaskComment.vue";
-import TaskTime from "./TaskTime.vue";
-import TaskStart from "./TaskStart.vue";
-import TaskEnd from "./TaskEnd.vue";
-import TaskTags from "./TaskTags.vue";
-import TaskStatus from "./TaskStatus.vue";
-import TaskOurCar from "./TaskOurCar.vue";
-import TaskGroupHeader from "./TaskGroupHeader.vue";
-import TaskNoData from "./TaskNoData.vue";
-import TaskMode from "./TaskMode.vue";
+import { computed, defineModel } from "vue"
+import { useAppStore } from "../../store.js"
+import TaskActions from "./TaskActions.vue"
+import TaskComment from "./TaskComment.vue"
+import TaskTime from "./TaskTime.vue"
+import TaskStart from "./TaskStart.vue"
+import TaskEnd from "./TaskEnd.vue"
+import TaskTags from "./TaskTags.vue"
+import TaskStatus from "./TaskStatus.vue"
+import TaskOurCar from "./TaskOurCar.vue"
+import TaskGroupHeader from "./TaskGroupHeader.vue"
+import TaskNoData from "./TaskNoData.vue"
+import TaskMode from "./TaskMode.vue"
 
-const store = useAppStore();
+const store = useAppStore()
 
 const selectedIds = defineModel('selectedIds', {default: new Set()})
 
@@ -88,12 +88,12 @@ const tableHeaders = computed(() => [
     sortable: true,
     width: c.width || undefined
   })),
-]);
+])
 
 const tableStyle = computed(() => ({
   fontFamily: store.settings.fontFamily || "Roboto",
   fontSize: (store.settings.fontSize || 14) + "px",
-}));
+}))
 </script>
 
 <template>

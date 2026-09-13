@@ -9,13 +9,13 @@ const statusMeta = {
   running: { color: "success", icon: "systemIcons:iconPause" },
   paused: { color: "warning", icon: "systemIcons:iconPlay" },
   completed: { color: "secondary", icon: "systemIcons:iconStop" },
-};
+}
 
 const statusLabel = {
   running: "Запущена",
   paused: "На паузе",
   completed: "Завершена",
-};
+}
 
 defineOptions({name:'TaskMode'})
 </script>

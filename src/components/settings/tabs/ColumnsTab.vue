@@ -1,18 +1,18 @@
 <script setup>
-import { useAppStore } from "../../../store.js";
+import { useAppStore } from "../../../store.js"
 
-const store = useAppStore();
+const store = useAppStore()
 
 function moveUp(i) {
-  if (i > 0) store.moveColumn(i, i - 1);
+  if (i > 0) store.moveColumn(i, i - 1)
 }
 
 function moveDown(i) {
-  if (i < store.columns.length - 1) store.moveColumn(i, i + 1);
+  if (i < store.columns.length - 1) store.moveColumn(i, i + 1)
 }
 
 function setVisible(key, visible) {
-  store.setColumnVisible(key, visible);
+  store.setColumnVisible(key, visible)
 }
 </script>
 

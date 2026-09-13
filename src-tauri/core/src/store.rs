@@ -2,6 +2,7 @@
 //! CRUD задач, пользователей, тегов, клиентов. Каждая мутация сохраняет файл.
 
 use std::fs;
+use std::io::Write;
 use std::path::PathBuf;
 
 use crate::dt::{now_naive, parse_dt};
@@ -145,7 +146,15 @@ impl Store {
             "_next_status_id": self.next_status_id,
         });
         if let Ok(pretty) = serde_json::to_string_pretty(&obj) {
-            let _ = fs::write(&self.path, pretty);
+            // Атомарная запись: во временный файл в том же каталоге, затем rename.
+            let tmp = self.path.with_extension("json.tmp");
+            if let Ok(mut f) = fs::File::create(&tmp) {
+                if f.write_all(pretty.as_bytes()).is_ok() {
+                    let _ = f.sync_all();
+                    drop(f);
+                    let _ = fs::rename(&tmp, &self.path);
+                }
+            }
         }
     }
 
@@ -868,6 +877,15 @@ pub fn import_json_file(
     pub fn set_columns(&mut self, columns: Vec<ColumnPref>) {
         self.settings.columns = columns;
         self.save();
+    }
+
+    /// Сохранить пользовательский каталог бэкапов ("" = по умолчанию).
+    pub fn set_backups_dir(&mut self, dir: String) {
+        let dir = dir.trim().to_string();
+        if dir.chars().count() <= 512 {
+            self.settings.backup_dir = dir;
+            self.save();
+        }
     }
 }
 

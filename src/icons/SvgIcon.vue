@@ -1,20 +1,20 @@
 <script setup>
-import { computed } from "vue";
+import { computed } from "vue"
 
 const props = defineProps({
   name: { type: String, required: true },
-});
+})
 
 const icons = import.meta.glob("../icons/*.svg", {
   query: "?raw",
   import: "default",
   eager: true,
-});
+})
 
 const svg = computed(() => {
-  const key = Object.keys(icons).find((k) => k.endsWith(`/${props.name}.svg`));
-  return key ? icons[key] : "";
-});
+  const key = Object.keys(icons).find((k) => k.endsWith(`/${props.name}.svg`))
+  return key ? icons[key] : ""
+})
 </script>
 
 <template>

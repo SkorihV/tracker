@@ -1,6 +1,6 @@
 <script setup>
 import {defineProps} from 'vue'
-import {useAppStore} from "../../store.js";
+import {useAppStore} from "../../store.js"
 const store = useAppStore()
 
 const props = defineProps({
@@ -11,17 +11,17 @@ const emit = defineEmits(["edit", "delete"])
 
 
 async function onPause(task) {
-  if (task.mode === "running") await store.pauseTask(task.taskId);
+  if (task.mode === "running") await store.pauseTask(task.taskId)
 }
 
 async function onComplete(task) {
-  await store.completeTask(task.taskId);
+  await store.completeTask(task.taskId)
 }
 
 async function onStart(task) {
-  if (task.mode === "running") return;
-  if (task.mode === "paused") await store.resumeTask(task.taskId);
-  else await store.startTask(task.taskId);
+  if (task.mode === "running") return
+  if (task.mode === "paused") await store.resumeTask(task.taskId)
+  else await store.startTask(task.taskId)
 }
 defineOptions({name:'TaskActions'})
 </script>

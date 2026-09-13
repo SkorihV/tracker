@@ -1,106 +1,108 @@
 <script setup>
-import { ref, reactive } from "vue";
-import { statusHex } from "../../../statusColors.js";
-import ConfirmDialog from "../../ConfirmDialog.vue";
+import { ref, reactive, nextTick } from "vue"
+import { statusHex } from "../../../statusColors.js"
+import ConfirmDialog from "../../ConfirmDialog.vue"
 
-const emit = defineEmits(["action"]);
+const emit = defineEmits(["action"])
 const props = defineProps({
   items: { type: Array, default: () => [] },
-});
+})
 
-const newName = ref("");
-const newColor = ref("");
-const newMenu = ref(false);
-const editingKey = ref(null);
-const editName = ref("");
-const pendingDelete = ref(null);
-const pendingClear = ref(false);
-const menus = reactive({});
-const picker = reactive({});
+const newName = ref("")
+const newColor = ref("")
+const newMenu = ref(false)
+const editingKey = ref(null)
+const editName = ref("")
+const pendingDelete = ref(null)
+const pendingClear = ref(false)
+const editInputs = {}
+const menus = reactive({})
+const picker = reactive({})
 
 function nameOf(item) {
-  return item.name;
+  return item.name
 }
 
 function colorOf(item) {
-  return item.color || "";
+  return item.color || ""
 }
 
 function swatchStyle(color) {
-  const c = statusHex(color);
-  return c ? `background-color: ${c};` : "";
+  const c = statusHex(color)
+  return c ? `background-color: ${c};` : ""
 }
 
 function currentHex(item) {
-  return statusHex(colorOf(item)) || "#1E88E5";
+  return statusHex(colorOf(item)) || "#1E88E5"
 }
 
 function openColorMenu(item) {
-  picker[item.id] = currentHex(item);
-  menus[item.id] = true;
+  picker[item.id] = currentHex(item)
+  menus[item.id] = true
 }
 
 function applyColor(item) {
-  const c = (picker[item.id] || "").trim();
+  const c = (picker[item.id] || "").trim()
   if (c !== colorOf(item)) {
-    emit("action", { action: "color", id: item.id, color: c });
+    emit("action", { action: "color", id: item.id, color: c })
   }
-  menus[item.id] = false;
+  menus[item.id] = false
 }
 
 function startEdit(item) {
-  editingKey.value = item.id;
-  editName.value = item.name;
+  editingKey.value = item.id
+  editName.value = item.name
+  nextTick(() => editInputs[item.id]?.focus())
 }
 
 function cancelEdit() {
-  editingKey.value = null;
+  editingKey.value = null
 }
 
 function saveEdit(item) {
-  const val = editName.value.trim();
+  const val = editName.value.trim()
   if (val && val !== nameOf(item)) {
-    emit("action", { action: "rename", old: nameOf(item), name: val });
+    emit("action", { action: "rename", old: nameOf(item), name: val })
   }
-  cancelEdit();
+  cancelEdit()
 }
 
 function applyNewColor() {
-  newColor.value = (picker.new || "").trim();
-  newMenu.value = false;
+  newColor.value = (picker.new || "").trim()
+  newMenu.value = false
 }
 
 function add() {
-  const val = newName.value.trim();
-  if (!val) return;
-  emit("action", { action: "add", name: val, color: newColor.value });
-  newName.value = "";
+  const val = newName.value.trim()
+  if (!val) return
+  emit("action", { action: "add", name: val, color: newColor.value })
+  newName.value = ""
 }
 
 function remove(item) {
-  pendingDelete.value = item;
+  pendingDelete.value = item
 }
 
 function confirmRemove() {
-  if (!pendingDelete.value) return;
-  const item = pendingDelete.value;
-  pendingDelete.value = null;
-  emit("action", { action: "remove", id: item.id });
+  if (!pendingDelete.value) return
+  const item = pendingDelete.value
+  pendingDelete.value = null
+  emit("action", { action: "remove", id: item.id })
 }
 
 function clearAll() {
-  pendingClear.value = true;
+  pendingClear.value = true
 }
 
 function confirmClear() {
-  pendingClear.value = false;
-  emit("action", { action: "clear" });
+  pendingClear.value = false
+  emit("action", { action: "clear" })
 }
 
 function move(index, step) {
-  const to = index + step;
-  if (to < 0 || to >= props.items.length) return;
-  emit("action", { action: "move", from: index, to });
+  const to = index + step
+  if (to < 0 || to >= props.items.length) return
+  emit("action", { action: "move", from: index, to })
 }
 </script>
 
@@ -117,6 +119,7 @@ function move(index, step) {
                 <v-btn
                     v-bind="menuProps"
                     icon
+                    border
                     size="small"
                     variant="flat"
                     :aria-label="nameOf(item)"
@@ -139,6 +142,7 @@ function move(index, step) {
 
             <v-text-field
                 v-if="editingKey === item.id"
+                :ref="(el) => { if (el) editInputs[item.id] = el; }"
                 v-model="editName"
                 density="compact"
                 variant="outlined"
@@ -188,9 +192,10 @@ function move(index, step) {
         <template #activator="{ props: menuProps }">
           <v-btn
             v-bind="menuProps"
-            variant="tonal"
-            aria-label="Цвет нового статуса"
-            :style="swatchStyle(newColor)"
+            variant="flat"
+            border
+            icon="systemIcons:iconColor"
+              :style="swatchStyle(newColor)"
             @click="picker.new = '#00000'; newMenu = true"
           />
         </template>

@@ -1,30 +1,30 @@
 <script setup>
-import { ref, computed } from "vue";
-import { useAppStore } from "../../store.js";
-import EntityPanel from "../EntityPanel.vue";
-import ColumnsTab from "./tabs/ColumnsTab.vue";
-import StatusesTab from "./tabs/StatusesTab.vue";
-import GeneralTab from "./tabs/GeneralTab.vue";
-import BaseModal from "../BaseModal.vue";
+import { ref, computed } from "vue"
+import { useAppStore } from "../../store.js"
+import EntityPanel from "../EntityPanel.vue"
+import ColumnsTab from "./tabs/ColumnsTab.vue"
+import StatusesTab from "./tabs/StatusesTab.vue"
+import GeneralTab from "./tabs/GeneralTab.vue"
+import BaseModal from "../BaseModal.vue"
 
-const store = useAppStore();
-const emit = defineEmits(["close"]);
+const store = useAppStore()
+const emit = defineEmits(["close"])
 
-const tab = ref("users");
+const tab = ref("users")
 const curUser = computed({
   get: () => store.settings.username,
   set: (v) => {
-    if (v) store.applySettings(v, store.settings.grouping);
+    if (v) store.applySettings(v, store.settings.grouping)
   },
-});
+})
 
 async function onAction(kind, payload) {
-  await store.saveEntity(kind, payload);
+  await store.saveEntity(kind, payload)
 }
 </script>
 
 <template>
-  <BaseModal title="Настройки" width="960" height="80vh" @close="emit('close')">
+  <BaseModal title="Настройки" max-width="800" width="960" height="80vh" @close="emit('close')">
     <v-tabs v-model="tab" color="primary" class="mb-4">
           <v-tab value="general">Общее</v-tab>
           <v-tab value="users">Пользователи</v-tab>

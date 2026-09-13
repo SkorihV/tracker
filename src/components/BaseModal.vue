@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from "vue";
+import { computed } from "vue"
 
 const props = defineProps({
   title: { type: String, default: "" },
@@ -8,9 +8,9 @@ const props = defineProps({
   width: { type: [Number, String], default: undefined },
   height: { type: [Number, String], default: undefined },
   bodyClass: { type: String, default: "pt-5" },
-});
+})
 
-const emit = defineEmits(["close"]);
+const emit = defineEmits(["close"])
 
 defineOptions({name:'BaseModal'})
 </script>

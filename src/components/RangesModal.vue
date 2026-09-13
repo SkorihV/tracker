@@ -1,49 +1,49 @@
 <script setup>
-import { ref } from "vue";
-import BaseModal from "./BaseModal.vue";
+import { ref } from "vue"
+import BaseModal from "./BaseModal.vue"
 
 const props = defineProps({
   text: { type: String, default: "" },
-});
+})
 
-const emit = defineEmits(["save", "close"]);
+const emit = defineEmits(["save", "close"])
 
-const error = ref("");
-const localText = ref(props.text);
+const error = ref("")
+const localText = ref(props.text)
 
 const LINE_RE =
-  /^\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}(?:\s*[—–-]\s*(?:\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}|\d{2}:\d{2}|открыт)?)?$/i;
+  /^\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}(?:\s*[—–-]\s*(?:\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}|\d{2}:\d{2}|открыт)?)?$/i
 
 function validate() {
-  error.value = "";
+  error.value = ""
   const lines = localText.value
     .split("\n")
     .map((l) => l.trim())
-    .filter(Boolean);
+    .filter(Boolean)
   if (!lines.length) {
-    error.value = "Должен быть хотя бы один диапазон";
-    return null;
+    error.value = "Должен быть хотя бы один диапазон"
+    return null
   }
   for (const line of lines) {
     if (!LINE_RE.test(line)) {
-      error.value = `Неверный формат строки: «${line}»`;
-      return null;
+      error.value = `Неверный формат строки: «${line}»`
+      return null
     }
   }
   if (lines.length > 1) {
     for (let i = 0; i < lines.length - 1; i++) {
       if (!lines[i].includes("—") && !lines[i].includes("–") && !lines[i].includes("-")) {
-        error.value = "Открытым может быть только последний диапазон";
-        return null;
+        error.value = "Открытым может быть только последний диапазон"
+        return null
       }
     }
   }
-  return lines;
+  return lines
 }
 
 function save() {
-  const lines = validate();
-  if (lines) emit("save", lines);
+  const lines = validate()
+  if (lines) emit("save", lines)
 }
 </script>
 

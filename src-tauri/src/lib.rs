@@ -2,26 +2,66 @@
 
 mod commands;
 
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use tauri::State;
+use tauri::{AppHandle, Manager, State};
 use tracker_core::backups;
 use tracker_core::logic::TaskFilter;
-use tracker_core::models::ColumnPref;
-use tracker_core::models::TaskDraft;
+use tracker_core::models::{ColumnPref, TaskDraft};
 use tracker_core::report;
 use tracker_core::store::Store;
 
 use commands::{AppStore, QueryView};
 
-fn base_dir() -> std::path::PathBuf {
+/// Базовый каталог данных: TT_BASE_DIR (dev) либо AppData приложения.
+fn base_dir(app: &AppHandle) -> PathBuf {
     if let Ok(d) = std::env::var("TT_BASE_DIR") {
-        return std::path::PathBuf::from(d);
+        return PathBuf::from(d);
     }
-    std::env::current_exe()
-        .ok()
-        .and_then(|p| p.parent().map(|p| p.to_path_buf()))
-        .unwrap_or_else(|| std::path::PathBuf::from("."))
+    app.path()
+        .app_data_dir()
+        .unwrap_or_else(|_| std::path::PathBuf::from("."))
+}
+
+/// Каталог бэкапов: пользовательский (из настроек) либо base/backups по умолчанию.
+fn resolve_backups_dir(base: &Path, user_dir: &str) -> PathBuf {
+    let d = user_dir.trim();
+    if d.is_empty() {
+        base.join("backups")
+    } else {
+        PathBuf::from(d)
+    }
+}
+
+/// Перенос данных из прежней локации (папка data/ и файл рядом с exe) в новую.
+fn migrate_old_data(app: &AppHandle, new_data: &Path) {
+    if new_data.exists() {
+        return;
+    }
+    let bases = [
+        tracker_core::store::data_file(base_dir(app).clone()),
+        tracker_core::store::legacy_data_file(base_dir(app)),
+        std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+            .map(|dir| tracker_core::store::data_file(dir))
+            .unwrap_or_default(),
+        std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+            .map(|dir| tracker_core::store::legacy_data_file(dir))
+            .unwrap_or_default(),
+    ];
+    for src in bases {
+        if src.exists() {
+            if let Some(parent) = new_data.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            let _ = std::fs::rename(&src, new_data);
+            return;
+        }
+    }
 }
 
 #[tauri::command]
@@ -44,17 +84,26 @@ fn report_preview(s: State<'_, AppStore>, filter: TaskFilter) -> Result<report::
 
 #[tauri::command]
 fn create_report(
+    app: AppHandle,
     s: State<'_, AppStore>,
     format: String,
     filter: TaskFilter,
     date_from: String,
     date_to: String,
+    path: Option<String>,
 ) -> Result<String, String> {
     let st = s.0.lock().map_err(|e| e.to_string())?;
-    let base = base_dir();
     let accent = st.settings.accent_color.clone();
-    let path = report::write_report(&base, &format, &st.tasks, &filter, &date_from, &date_to, &accent)?;
-    Ok(path.to_string_lossy().to_string())
+    let saved = match path {
+        Some(p) if !p.is_empty() => {
+            report::write_report_to(std::path::Path::new(&p), &format, &st.tasks, &filter, &date_from, &date_to, &accent)?
+        }
+        _ => {
+            let base = base_dir(&app);
+            report::write_report(&base, &format, &st.tasks, &filter, &date_from, &date_to, &accent)?
+        }
+    };
+    Ok(saved.to_string_lossy().to_string())
 }
 
 #[tauri::command]
@@ -65,17 +114,26 @@ fn stats_preview(s: State<'_, AppStore>, filter: TaskFilter) -> Result<report::S
 
 #[tauri::command]
 fn create_stats(
+    app: AppHandle,
     s: State<'_, AppStore>,
     format: String,
     filter: TaskFilter,
     date_from: String,
     date_to: String,
+    path: Option<String>,
 ) -> Result<String, String> {
     let st = s.0.lock().map_err(|e| e.to_string())?;
-    let base = base_dir();
     let accent = st.settings.accent_color.clone();
-    let path = report::write_stats(&base, &format, &st.tasks, &filter, &date_from, &date_to, &accent)?;
-    Ok(path.to_string_lossy().to_string())
+    let saved = match path {
+        Some(p) if !p.is_empty() => {
+            report::write_stats_to(std::path::Path::new(&p), &format, &st.tasks, &filter, &date_from, &date_to, &accent)?
+        }
+        _ => {
+            let base = base_dir(&app);
+            report::write_stats(&base, &format, &st.tasks, &filter, &date_from, &date_to, &accent)?
+        }
+    };
+    Ok(saved.to_string_lossy().to_string())
 }
 
 #[tauri::command]
@@ -198,6 +256,21 @@ fn set_columns(s: State<'_, AppStore>, columns: Vec<ColumnPref>) -> Result<(), S
         .map_err(|e| e.to_string())?
         .set_columns(columns);
     Ok(())
+}
+
+#[tauri::command]
+fn set_backups_dir(s: State<'_, AppStore>, dir: String) -> Result<(), String> {
+    s.0.lock()
+        .map_err(|e| e.to_string())?
+        .set_backups_dir(dir);
+    Ok(())
+}
+
+#[tauri::command]
+fn default_backups_dir(app: AppHandle) -> Result<String, String> {
+    Ok(resolve_backups_dir(&base_dir(&app), "")
+        .to_string_lossy()
+        .to_string())
 }
 
 #[tauri::command]
@@ -329,34 +402,22 @@ fn move_status(s: State<'_, AppStore>, from: usize, to: usize) -> Result<(), Str
 }
 
 pub fn run() {
-    let base = base_dir();
-    let data = tracker_core::store::data_file(base.clone());
-    let legacy = tracker_core::store::legacy_data_file(base.clone());
-
-    // миграция легаси-файла: base/time_tracker_v2_data.json -> base/data/…
-    if !data.exists() {
-        if let Some(parent) = data.parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
-        if legacy.exists() {
-            let _ = std::fs::rename(&legacy, &data);
-        }
-        let _ = legacy; // (необязательно для загрузки ниже)
-    }
-
-    let store = AppStore(Mutex::new(Store::open(data.clone())));
-
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .manage(store)
-        .setup(move |app| {
-            let _ = app;
-            let base2 = base_dir();
-            let data2 = tracker_core::store::data_file(base2.clone());
-            let data_dir = data2.parent().map(|p| p.to_path_buf()).unwrap_or_default();
-            let backups_dir = base2.join("backups");
+        .setup(|app| {
+            let base = base_dir(app.handle());
+            let data = tracker_core::store::data_file(base.clone());
+            migrate_old_data(app.handle(), &data);
+            let data_dir = data.parent().map(|p| p.to_path_buf()).unwrap_or_default();
             backups::migrate_old_backups(&data_dir);
-            backups::create_backups(&data2, &backups_dir);
+
+            let store = AppStore(Mutex::new(Store::open(data.clone())));
+            {
+                let st = store.0.lock().map_err(|e| e.to_string())?;
+                let backups_dir = resolve_backups_dir(&base, &st.settings.backup_dir);
+                backups::create_backups(&data, &backups_dir);
+            }
+            app.manage(store);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -382,6 +443,8 @@ pub fn run() {
             set_our_car_color,
             set_table_font,
             set_columns,
+            set_backups_dir,
+            default_backups_dir,
             add_user,
             remove_user,
             clear_users,

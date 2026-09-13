@@ -1,18 +1,18 @@
 <script setup>
-import { ref, computed, onMounted } from "vue";
-import { open } from "@tauri-apps/plugin-dialog";
-import { useAppStore, DEFAULT_ACCENT_COLOR, DEFAULT_OUR_CAR_COLOR, DEFAULT_TABLE_FONT_FAMILY, DEFAULT_TABLE_FONT_SIZE } from "../../../store.js";
+import { ref, computed, onMounted } from "vue"
+import { open } from "@tauri-apps/plugin-dialog"
+import { useAppStore, DEFAULT_ACCENT_COLOR, DEFAULT_OUR_CAR_COLOR, DEFAULT_TABLE_FONT_FAMILY, DEFAULT_TABLE_FONT_SIZE } from "../../../store.js"
 
-const store = useAppStore();
+const store = useAppStore()
 
-const color = ref(store.settings.accentColor || DEFAULT_ACCENT_COLOR);
-const menu = ref(false);
+const color = ref(store.settings.accentColor || DEFAULT_ACCENT_COLOR)
+const menu = ref(false)
 
-const ourCarColor = ref(store.settings.ourCarColor || DEFAULT_OUR_CAR_COLOR);
-const ourCarMenu = ref(false);
+const ourCarColor = ref(store.settings.ourCarColor || DEFAULT_OUR_CAR_COLOR)
+const ourCarMenu = ref(false)
 
-const fontFamily = ref(store.settings.fontFamily || DEFAULT_TABLE_FONT_FAMILY);
-const fontSize = ref(store.settings.fontSize || DEFAULT_TABLE_FONT_SIZE);
+const fontFamily = ref(store.settings.fontFamily || DEFAULT_TABLE_FONT_FAMILY)
+const fontSize = ref(store.settings.fontSize || DEFAULT_TABLE_FONT_SIZE)
 
 const fontFamilyOptions = [
   "Roboto",
@@ -27,81 +27,81 @@ const fontFamilyOptions = [
   "monospace",
   "sans-serif",
   "serif",
-];
+]
 
-const fontSizeOptions = [10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24];
+const fontSizeOptions = [10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24]
 
 const swatchStyle = computed(() =>
   ({ backgroundColor: color.value || DEFAULT_ACCENT_COLOR })
-);
+)
 
 const ourCarSwatchStyle = computed(() =>
   ({ backgroundColor: ourCarColor.value || DEFAULT_OUR_CAR_COLOR })
-);
+)
 
 function apply() {
-  store.setAccentColor(color.value);
-  menu.value = false;
+  store.setAccentColor(color.value)
+  menu.value = false
 }
 
 function applyFromInput() {
   if (/^#[0-9a-fA-F]{6}$/.test(color.value.trim())) {
-    store.setAccentColor(color.value.trim());
+    store.setAccentColor(color.value.trim())
   }
 }
 
 function resetDefault() {
-  color.value = DEFAULT_ACCENT_COLOR;
-  store.setAccentColor(DEFAULT_ACCENT_COLOR);
+  color.value = DEFAULT_ACCENT_COLOR
+  store.setAccentColor(DEFAULT_ACCENT_COLOR)
 }
 
 function applyOurCar() {
-  store.setOurCarColor(ourCarColor.value);
-  ourCarMenu.value = false;
+  store.setOurCarColor(ourCarColor.value)
+  ourCarMenu.value = false
 }
 
 function applyOurCarFromInput() {
   if (/^#[0-9a-fA-F]{6}$/.test(ourCarColor.value.trim())) {
-    store.setOurCarColor(ourCarColor.value.trim());
+    store.setOurCarColor(ourCarColor.value.trim())
   }
 }
 
 function resetOurCarDefault() {
-  ourCarColor.value = DEFAULT_OUR_CAR_COLOR;
-  store.setOurCarColor(DEFAULT_OUR_CAR_COLOR);
+  ourCarColor.value = DEFAULT_OUR_CAR_COLOR
+  store.setOurCarColor(DEFAULT_OUR_CAR_COLOR)
 }
 
 function applyFont() {
-  store.setTableFont(fontFamily.value, fontSize.value);
+  store.setTableFont(fontFamily.value, fontSize.value)
 }
 
 function resetFontDefault() {
-  fontFamily.value = DEFAULT_TABLE_FONT_FAMILY;
-  fontSize.value = DEFAULT_TABLE_FONT_SIZE;
-  store.setTableFont(DEFAULT_TABLE_FONT_FAMILY, DEFAULT_TABLE_FONT_SIZE);
+  fontFamily.value = DEFAULT_TABLE_FONT_FAMILY
+  fontSize.value = DEFAULT_TABLE_FONT_SIZE
+  store.setTableFont(DEFAULT_TABLE_FONT_FAMILY, DEFAULT_TABLE_FONT_SIZE)
 }
 
-const defaultBackupsPath = ref("");
-const backupsPath = ref("");
+const defaultBackupsPath = ref("")
+const backupsPath = ref("")
 
 onMounted(async () => {
-  defaultBackupsPath.value = await store.getDefaultBackupsDir();
-  const effective = await store.effectiveBackupsDir();
-  backupsPath.value = effective;
-});
+  defaultBackupsPath.value = await store.getDefaultBackupsDir()
+  const effective = await store.effectiveBackupsDir()
+  backupsPath.value = effective
+})
 
 async function pickBackupsDir() {
-  const picked = await open({ directory: true, multiple: false });
+  const picked = await open({ directory: true, multiple: false })
   if (picked) {
-    const p = String(picked);
-    await store.setBackupsDir(p);
-    backupsPath.value = p;
+    const p = String(picked)
+    await store.setBackupsDir(p)
+    backupsPath.value = p
   }
 }
 
 async function resetBackupsDir() {
-  await store.setBackupsDir(defaultBackupsPath.value);
-  backupsPath.value = defaultBackupsPath.value;
+  await store.setBackupsDir(defaultBackupsPath.value)
+  backupsPath.value = defaultBackupsPath.value
 }
 </script>
 

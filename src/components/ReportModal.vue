@@ -1,62 +1,62 @@
 <script setup>
-import { ref, watch } from "vue";
-import { save } from "@tauri-apps/plugin-dialog";
-import { api } from "../api";
-import { useAppStore } from "../store";
-import { reportFilter } from "../reportFilter";
-import BaseModal from "./BaseModal.vue";
-import ReportPeriodFields from "./ReportPeriodFields.vue";
+import { ref, watch } from "vue"
+import { save } from "@tauri-apps/plugin-dialog"
+import { api } from "../api"
+import { useAppStore } from "../store"
+import { reportFilter } from "../reportFilter"
+import BaseModal from "./BaseModal.vue"
+import ReportPeriodFields from "./ReportPeriodFields.vue"
 
-const store = useAppStore();
-const emit = defineEmits(["close"]);
+const store = useAppStore()
+const emit = defineEmits(["close"])
 
-const format = ref("txt");
-const dateFrom = ref(store.filter.dateFrom || "");
-const dateTo = ref(store.filter.dateTo || "");
+const format = ref("txt")
+const dateFrom = ref(store.filter.dateFrom || "")
+const dateTo = ref(store.filter.dateTo || "")
 
-const preview = ref(null);
-const loading = ref(false);
-const error = ref("");
-const saved = ref("");
+const preview = ref(null)
+const loading = ref(false)
+const error = ref("")
+const saved = ref("")
 
 function tsNow() {
-  const d = new Date();
-  const p = (n) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+  const d = new Date()
+  const p = (n) => String(n).padStart(2, "0")
+  return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`
 }
 
 async function loadPreview() {
-  loading.value = true;
-  error.value = "";
+  loading.value = true
+  error.value = ""
   try {
-    preview.value = await api.reportPreview(reportFilter(dateFrom.value, dateTo.value, store.filter));
+    preview.value = await api.reportPreview(reportFilter(dateFrom.value, dateTo.value, store.filter))
   } catch (e) {
-    error.value = String(e);
-    preview.value = null;
+    error.value = String(e)
+    preview.value = null
   } finally {
-    loading.value = false;
+    loading.value = false
   }
 }
 
 async function saveReport() {
-  error.value = "";
-  saved.value = "";
+  error.value = ""
+  saved.value = ""
   try {
-    const ext = format.value;
+    const ext = format.value
     const target = await save({
       defaultPath: `report_${tsNow()}.${ext}`,
       filters: [{ name: ext.toUpperCase(), extensions: [ext] }],
-    });
-    if (!target) return;
-    const path = await api.createReport(ext, reportFilter(dateFrom.value, dateTo.value, store.filter), dateFrom.value, dateTo.value, target);
-    saved.value = path;
+    })
+    if (!target) return
+    const path = await api.createReport(ext, reportFilter(dateFrom.value, dateTo.value, store.filter), dateFrom.value, dateTo.value, target)
+    saved.value = path
   } catch (e) {
-    error.value = String(e);
+    error.value = String(e)
   }
 }
 
-watch([dateFrom, dateTo, () => store.filter.search], () => loadPreview());
-loadPreview();
+watch([dateFrom, dateTo, () => store.filter.search], () => loadPreview())
+loadPreview()
 </script>
 
 <template>

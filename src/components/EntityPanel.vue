@@ -1,84 +1,86 @@
 <script setup>
-import { ref } from "vue";
-import ConfirmDialog from "./ConfirmDialog.vue";
+import { ref, nextTick } from "vue"
+import ConfirmDialog from "./ConfirmDialog.vue"
 
 const props = defineProps({
   kind: { type: String, required: true },
   title: { type: String, required: true },
   items: { type: Array, default: () => [] },
-});
+})
 
-const emit = defineEmits(["action"]);
+const emit = defineEmits(["action"])
 
-const newName = ref("");
-const editingKey = ref(null);
-const editName = ref("");
-const pendingDelete = ref(null);
-const pendingClear = ref(false);
+const newName = ref("")
+const editingKey = ref(null)
+const editName = ref("")
+const pendingDelete = ref(null)
+const pendingClear = ref(false)
+const editInputs = {}
 
 const placeholder = {
   user: "Новый пользователь…",
   tag: "Новый тег…",
   client: "Новый клиент…",
-}[props.kind] || "Новое имя…";
+}[props.kind] || "Новое имя…"
 
 function keyOf(item) {
-  return props.kind === "user" ? item : String(item.id);
+  return props.kind === "user" ? item : String(item.id)
 }
 function nameOf(item) {
-  return typeof item === "string" ? item : item.name;
+  return typeof item === "string" ? item : item.name
 }
 
 function startEdit(key, name) {
-  editingKey.value = key;
-  editName.value = name;
+  editingKey.value = key
+  editName.value = name
+  nextTick(() => editInputs[key]?.focus())
 }
 
 function cancelEdit() {
-  editingKey.value = null;
+  editingKey.value = null
 }
 
 function saveEdit(key, oldName) {
-  const val = editName.value.trim();
+  const val = editName.value.trim()
   if (val && val !== oldName) {
-    emit("action", { action: "rename", id: key, name: val, old: oldName });
+    emit("action", { action: "rename", id: key, name: val, old: oldName })
   }
-  cancelEdit();
+  cancelEdit()
 }
 
 function add() {
-  const val = newName.value.trim();
-  if (!val) return;
-  emit("action", { action: "add", name: val });
-  newName.value = "";
+  const val = newName.value.trim()
+  if (!val) return
+  emit("action", { action: "add", name: val })
+  newName.value = ""
 }
 
 function remove(item) {
-  pendingDelete.value = { key: keyOf(item), name: nameOf(item), item };
+  pendingDelete.value = { key: keyOf(item), name: nameOf(item), item }
 }
 
 function confirmRemove() {
-  if (!pendingDelete.value) return;
-  const { key, name, item } = pendingDelete.value;
-  pendingDelete.value = null;
+  if (!pendingDelete.value) return
+  const { key, name, item } = pendingDelete.value
+  pendingDelete.value = null
   // backend remove_user ждёт имя; remove_tag/remove_client — числовой id
-  const id = props.kind === "user" ? key : item.id;
-  emit("action", { action: "remove", id, name });
+  const id = props.kind === "user" ? key : item.id
+  emit("action", { action: "remove", id, name })
 }
 
 function clearAll() {
-  pendingClear.value = true;
+  pendingClear.value = true
 }
 
 function confirmClear() {
-  pendingClear.value = false;
-  emit("action", { action: "clear" });
+  pendingClear.value = false
+  emit("action", { action: "clear" })
 }
 
 function move(index, step) {
-  const to = index + step;
-  if (to < 0 || to >= props.items.length) return;
-  emit("action", { action: "move", from: index, to });
+  const to = index + step
+  if (to < 0 || to >= props.items.length) return
+  emit("action", { action: "move", from: index, to })
 }
 </script>
 
@@ -95,6 +97,7 @@ function move(index, step) {
         <template v-if="editingKey === keyOf(item)">
           <div class="d-flex align-center ga-2">
             <v-text-field
+              :ref="(el) => { if (el) editInputs[keyOf(item)] = el; }"
               v-model="editName"
               density="compact"
               variant="outlined"
