@@ -113,6 +113,7 @@ async function doImport() {
     </template>
 
     <template v-else>
+      <div class="d-flex ga-2">
       <v-text-field
         :model-value="importOpts.path"
         label="Файл для импорта"
@@ -124,9 +125,10 @@ async function doImport() {
         :append-inner-icon="importOpts.path ? 'systemIcons:iconClose' : undefined"
         @click:append-inner="importOpts.path = ''"
       />
-      <v-btn variant="tonal" size="small" prepend-icon="systemIcons:iconImport" class="mb-3" @click="pickFile">
-        Выбрать…
+      <v-btn variant="tonal" prepend-icon="systemIcons:iconImport" @click="pickFile">
+        Выбрать
       </v-btn>
+      </div>
       <v-checkbox v-model="importOpts.tasks" label="Задачи" density="compact" hide-details />
       <v-checkbox v-model="importOpts.tags" label="Теги" density="compact" hide-details />
       <v-checkbox v-model="importOpts.clients" label="Клиенты" density="compact" hide-details />
@@ -137,12 +139,12 @@ async function doImport() {
       <v-btn variant="text" @click="emit('close')">Закрыть</v-btn>
       <template v-if="tab === 'export'">
         <v-btn color="primary" variant="flat" prepend-icon="systemIcons:iconExport" :disabled="busy" @click="doExport">
-          Экспорт…
+          Экспорт
         </v-btn>
       </template>
       <template v-else>
         <v-btn color="primary" variant="flat" prepend-icon="systemIcons:iconImport" :disabled="busy || !importOpts.path" @click="doImport">
-          Импортировать…
+          Импортировать
         </v-btn>
       </template>
     </template>

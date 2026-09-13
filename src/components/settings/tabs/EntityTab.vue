@@ -1,6 +1,6 @@
 <script setup>
 import { ref, nextTick } from "vue"
-import ConfirmDialog from "./ConfirmDialog.vue"
+import ConfirmDialog from "../../ConfirmDialog.vue"
 
 const props = defineProps({
   kind: { type: String, required: true },
@@ -103,7 +103,7 @@ function move(index, step) {
               variant="outlined"
               hide-details
               @keydown.enter="saveEdit(keyOf(item), nameOf(item))"
-              @keydown.esc="cancelEdit"
+              @keydown.esc.stop="cancelEdit"
             />
             <v-btn icon aria-label="Сохранить" variant="text" size="small" @click="saveEdit(keyOf(item), nameOf(item))">
               <v-icon icon="systemIcons:iconCheck" />

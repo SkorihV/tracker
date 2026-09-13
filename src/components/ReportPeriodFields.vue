@@ -4,13 +4,13 @@ import { dateRule } from "../dateRules.js"
 
 const dateFrom = defineModel('dateFrom', { type: String, default: '' })
 const dateTo = defineModel('dateTo', { type: String, default: '' })
-const format = defineModel('format', { type: String, default: 'txt' })
+const format = defineModel('format', { type: String, default: 'xlsx' })
 
 defineProps({
   emptyHint: { type: String, default: "" },
 })
 
-const formats = ["txt", "md", "csv", "xlsx"]
+const formats = ["xlsx","txt", "md", "csv"]
 
 defineOptions({name:'ReportPeriodFields'})
 </script>

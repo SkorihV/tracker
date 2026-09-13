@@ -3,16 +3,16 @@ import { ref, watch } from "vue"
 import { save } from "@tauri-apps/plugin-dialog"
 import { api } from "../api"
 import { useAppStore } from "../store"
-import { reportFilter } from "../reportFilter"
+import {reportFilter, today} from "../reportFilter"
 import BaseModal from "./BaseModal.vue"
 import ReportPeriodFields from "./ReportPeriodFields.vue"
 
 const store = useAppStore()
 const emit = defineEmits(["close"])
 
-const format = ref("txt")
-const dateFrom = ref(store.filter.dateFrom || "")
-const dateTo = ref(store.filter.dateTo || "")
+const format = ref("xlsx")
+const dateFrom = ref(store.filter.dateFrom || today())
+const dateTo = ref(store.filter.dateTo || today())
 
 const preview = ref(null)
 const loading = ref(false)
@@ -60,7 +60,7 @@ loadPreview()
 </script>
 
 <template>
-  <BaseModal title="Отчёт" max-width="1000" max-height="85vh" @close="emit('close')">
+  <BaseModal title="Отчёт" max-width="1000" width="1000" max-height="85vh" @close="emit('close')">
     <ReportPeriodFields v-model:date-from="dateFrom" v-model:date-to="dateTo" v-model:format="format" empty-hint="пусто = без ограничения" />
 
     <v-alert v-if="error" type="error" density="compact" variant="tonal" class="mb-3">
@@ -110,12 +110,12 @@ loadPreview()
         </tbody>
       </v-table>
     </template>
-    <div v-if="loading" class="text-medium-emphasis text-caption">Загрузка…</div>
+    <div v-if="loading" class="text-medium-emphasis text-caption">Загрузка</div>
 
     <template #actions>
       <v-btn variant="text" @click="emit('close')">Закрыть</v-btn>
       <v-btn color="primary" variant="flat" :disabled="loading" prepend-icon="systemIcons:iconExport" @click="saveReport">
-        Сохранить…
+        Сохранить ({{ format.toUpperCase() }})
       </v-btn>
     </template>
   </BaseModal>

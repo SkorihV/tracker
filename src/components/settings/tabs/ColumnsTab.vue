@@ -24,6 +24,7 @@ function setVisible(key, visible) {
           :model-value="col.visible"
           density="compact"
           hide-details
+          color="primary"
           class="mr-2"
           :label="col.label"
           @update:model-value="setVisible(col.key, $event)"

@@ -149,7 +149,7 @@ function move(index, step) {
                 hide-details
                 class="flex-grow-1"
                 @keydown.enter="saveEdit(item)"
-                @keydown.esc="cancelEdit"
+                @keydown.esc.stop="cancelEdit"
               />
             <span v-else class="flex-grow-1 text-truncate px-2">{{ nameOf(item) }}</span>
             <template v-if="editingKey === item.id">
@@ -194,6 +194,7 @@ function move(index, step) {
             v-bind="menuProps"
             variant="flat"
             border
+            size="small"
             icon="systemIcons:iconColor"
               :style="swatchStyle(newColor)"
             @click="picker.new = '#00000'; newMenu = true"

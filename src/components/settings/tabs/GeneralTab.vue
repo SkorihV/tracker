@@ -120,7 +120,7 @@ async function resetBackupsDir() {
             :style="swatchStyle"
           />
         </template>
-        <v-sheet class="pa-2 d-flex flex-column ga-2">
+        <v-sheet class="pa-2 d-flex flex-column ga-2" border>
           <v-color-picker v-model="color" mode="hex" hide-inputs :width="280" />
           <v-btn color="primary" variant="flat" density="compact" @click="apply">
             Применить
@@ -142,7 +142,7 @@ async function resetBackupsDir() {
         @update:model-value="color = $event.trim()"
       />
 
-      <v-btn variant="tonal" density="compact" @click="resetDefault">
+      <v-btn variant="tonal" @click="resetDefault">
         По умолчанию
       </v-btn>
     </div>
@@ -160,7 +160,7 @@ async function resetBackupsDir() {
             :style="ourCarSwatchStyle"
           />
         </template>
-        <v-sheet class="pa-2 d-flex flex-column ga-2">
+        <v-sheet class="pa-2 d-flex flex-column ga-2" border>
           <v-color-picker v-model="ourCarColor" mode="hex" hide-inputs :width="280" />
           <v-btn color="primary" variant="flat" density="compact" @click="applyOurCar">
             Применить
@@ -182,7 +182,7 @@ async function resetBackupsDir() {
         @update:model-value="ourCarColor = $event.trim()"
       />
 
-      <v-btn variant="tonal" density="compact" @click="resetOurCarDefault">
+      <v-btn variant="tonal" @click="resetOurCarDefault">
         По умолчанию
       </v-btn>
     </div>
@@ -212,7 +212,7 @@ async function resetBackupsDir() {
           style="max-width: 130px"
           @update:model-value="applyFont"
         />
-        <v-btn variant="tonal" density="compact" @click="resetFontDefault">
+        <v-btn variant="tonal" @click="resetFontDefault">
           По умолчанию
         </v-btn>
       </div>
@@ -232,12 +232,11 @@ async function resetBackupsDir() {
         >
           {{ backupsPath || "…" }}
         </span>
-        <v-btn variant="tonal" density="compact" prepend-icon="systemIcons:iconFolder" @click="pickBackupsDir">
-          Выбрать…
+        <v-btn variant="tonal" prepend-icon="systemIcons:iconFolder" @click="pickBackupsDir">
+          Выбрать
         </v-btn>
         <v-btn
           variant="tonal"
-          density="compact"
           :disabled="!store.settings.backupDir"
           @click="resetBackupsDir"
         >

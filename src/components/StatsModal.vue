@@ -3,22 +3,17 @@ import { ref, watch, computed } from "vue"
 import { save } from "@tauri-apps/plugin-dialog"
 import { api } from "../api"
 import { useAppStore } from "../store"
-import { reportFilter } from "../reportFilter"
+import { reportFilter, today } from "../reportFilter"
 import BaseModal from "./BaseModal.vue"
 import ReportPeriodFields from "./ReportPeriodFields.vue"
 
 const store = useAppStore()
 const emit = defineEmits(["close"])
 
-function firstOfMonth() {
-  const d = new Date()
-  return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`
-}
+const dateFrom = ref(store.filter.dateFrom || today())
+const dateTo = ref(store.filter.dateTo || today())
 
-const dateFrom = ref(store.filter.dateFrom || firstOfMonth())
-const dateTo = ref(store.filter.dateTo || "")
-
-const format = ref("txt")
+const format = ref("xlsx")
 
 const stats = ref(null)
 const loading = ref(false)
@@ -76,7 +71,7 @@ loadStats()
 </script>
 
 <template>
-  <BaseModal title="Статистика" max-width="820" max-height="85vh" @close="emit('close')">
+  <BaseModal title="Статистика" max-width="1000" width="1000" max-height="85vh" @close="emit('close')">
     <ReportPeriodFields v-model:date-from="dateFrom" v-model:date-to="dateTo" v-model:format="format" />
 
     <v-alert v-if="error" type="error" density="compact" variant="tonal" class="mb-3">

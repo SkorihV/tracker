@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed } from "vue"
 import { useAppStore } from "../../store.js"
-import EntityPanel from "../EntityPanel.vue"
+import EntityTab from "./tabs/EntityTab.vue"
 import ColumnsTab from "./tabs/ColumnsTab.vue"
 import StatusesTab from "./tabs/StatusesTab.vue"
 import GeneralTab from "./tabs/GeneralTab.vue"
@@ -47,13 +47,13 @@ async function onAction(kind, payload) {
               class="mb-4"
               style="max-width: 360px"
           />
-          <EntityPanel kind="user" title="Пользователи" :items="store.users" @action="(p) => onAction('user', p)" />
+          <EntityTab kind="user" title="Пользователи" :items="store.users" @action="(p) => onAction('user', p)" />
         </div>
         <div v-if="tab === 'tags'">
-          <EntityPanel kind="tag" title="Теги" :items="store.tags" @action="(p) => onAction('tag', p)" />
+          <EntityTab kind="tag" title="Теги" :items="store.tags" @action="(p) => onAction('tag', p)" />
         </div>
         <div v-if="tab === 'clients'">
-          <EntityPanel kind="client" title="Клиенты" :items="store.clients" @action="(p) => onAction('client', p)" />
+          <EntityTab kind="client" title="Клиенты" :items="store.clients" @action="(p) => onAction('client', p)" />
         </div>
         <div v-if="tab === 'statuses'">
           <StatusesTab :items="store.statuses" @action="(p) => onAction('status', p)" />

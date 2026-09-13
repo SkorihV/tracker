@@ -81,7 +81,7 @@ function clearDates() {
       @update:model-value="store.refreshQuery()"
     />
 
-    <v-btn variant="outlined" size="small" @click="resetFilters">Сбросить</v-btn>
-    <v-btn variant="text" size="small" @click="clearDates">Очистить даты</v-btn>
+    <v-btn variant="outlined" @click="resetFilters">Сбросить</v-btn>
+    <v-btn variant="text" @click="clearDates">Очистить даты</v-btn>
   </div>
 </template>

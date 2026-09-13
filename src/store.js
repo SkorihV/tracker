@@ -32,7 +32,6 @@ function defaultColumns() {
     { key: "tags", label: "Тег", visible: true, width: '' },
     { key: "start", label: "Начало", visible: true, width: '180px' },
     { key: "end", label: "Завершение", visible: true, width: '180px' },
-
     { key: "user", label: "Пользователь", visible: true, width: '' },
     { key: "comment", label: "Комментарий", visible: true, width: '' },
     { key: "taskId", label: "ID", visible: false, width: '' },
