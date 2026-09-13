@@ -1,8 +1,9 @@
 <script setup>
-import { ref, reactive, computed } from "vue";
+import { ref, reactive } from "vue";
 import { save, open } from "@tauri-apps/plugin-dialog";
 import { api } from "../api";
 import { useAppStore } from "../store";
+import BaseModal from "./BaseModal.vue";
 
 const store = useAppStore();
 const emit = defineEmits(["close"]);
@@ -85,83 +86,65 @@ async function doImport() {
     busy.value = false;
   }
 }
-
-const dialogOpen = computed({
-  get: () => true,
-  set: () => emit("close"),
-});
 </script>
 
 <template>
-  <v-dialog v-model="dialogOpen" max-width="560" max-height="85vh">
-    <v-card class="modal-card">
-      <v-toolbar v-dialog-drag density="compact" color="primary">
-        <v-toolbar-title>Экспорт / Импорт</v-toolbar-title>
-        <v-spacer />
-        <v-btn icon variant="text" title="Закрыть" @click="emit('close')">
-          <v-icon>mdi-close</v-icon>
+  <BaseModal title="Экспорт / Импорт" @close="emit('close')">
+    <v-tabs v-model="tab" color="primary" class="mb-4">
+      <v-tab value="export">Экспорт</v-tab>
+      <v-tab value="import">Импорт</v-tab>
+    </v-tabs>
+
+    <v-alert v-if="error" type="error" density="compact" variant="tonal" class="mb-3">{{ error }}</v-alert>
+    <v-alert v-if="notice" type="success" density="compact" variant="tonal" class="mb-3">{{ notice }}</v-alert>
+
+    <template v-if="tab === 'export'">
+      <v-text-field
+        v-model="exportOpts.filename"
+        label="Файл (по умолчанию)"
+        density="compact"
+        variant="outlined"
+        class="mb-3"
+      />
+      <v-checkbox v-model="exportOpts.tasks" label="Задачи" density="compact" hide-details />
+      <v-checkbox v-model="exportOpts.tags" label="Теги" density="compact" hide-details />
+      <v-checkbox v-model="exportOpts.clients" label="Клиенты" density="compact" hide-details />
+      <v-checkbox v-model="exportOpts.users" label="Пользователи" density="compact" hide-details />
+    </template>
+
+    <template v-else>
+      <v-text-field
+        :model-value="importOpts.path"
+        label="Файл для импорта"
+        placeholder="не выбран"
+        density="compact"
+        variant="outlined"
+        readonly
+        class="mb-2"
+        :append-inner-icon="importOpts.path ? 'systemIcons:iconClose' : undefined"
+        @click:append-inner="importOpts.path = ''"
+      />
+      <v-btn variant="tonal" size="small" prepend-icon="systemIcons:iconImport" class="mb-3" @click="pickFile">
+        Выбрать…
+      </v-btn>
+      <v-checkbox v-model="importOpts.tasks" label="Задачи" density="compact" hide-details />
+      <v-checkbox v-model="importOpts.tags" label="Теги" density="compact" hide-details />
+      <v-checkbox v-model="importOpts.clients" label="Клиенты" density="compact" hide-details />
+      <v-checkbox v-model="importOpts.users" label="Пользователи" density="compact" hide-details />
+    </template>
+
+    <template #actions>
+      <v-btn variant="text" @click="emit('close')">Закрыть</v-btn>
+      <template v-if="tab === 'export'">
+        <v-btn color="primary" variant="flat" prepend-icon="systemIcons:iconExport" :disabled="busy" @click="doExport">
+          Экспорт…
         </v-btn>
-      </v-toolbar>
-
-      <v-card-text class="pt-5">
-        <v-tabs v-model="tab" color="primary" class="mb-4">
-          <v-tab value="export">Экспорт</v-tab>
-          <v-tab value="import">Импорт</v-tab>
-        </v-tabs>
-
-        <v-alert v-if="error" type="error" density="compact" variant="tonal" class="mb-3">{{ error }}</v-alert>
-        <v-alert v-if="notice" type="success" density="compact" variant="tonal" class="mb-3">{{ notice }}</v-alert>
-
-        <template v-if="tab === 'export'">
-          <v-text-field
-            v-model="exportOpts.filename"
-            label="Файл (по умолчанию)"
-            density="compact"
-            variant="outlined"
-            class="mb-3"
-          />
-          <v-checkbox v-model="exportOpts.tasks" label="Задачи" density="compact" hide-details />
-          <v-checkbox v-model="exportOpts.tags" label="Теги" density="compact" hide-details />
-          <v-checkbox v-model="exportOpts.clients" label="Клиенты" density="compact" hide-details />
-          <v-checkbox v-model="exportOpts.users" label="Пользователи" density="compact" hide-details />
-        </template>
-
-        <template v-else>
-          <v-text-field
-            :model-value="importOpts.path"
-            label="Файл для импорта"
-            placeholder="не выбран"
-            density="compact"
-            variant="outlined"
-            readonly
-            class="mb-2"
-            :append-inner-icon="importOpts.path ? 'systemIcons:iconClose' : undefined"
-            @click:append-inner="importOpts.path = ''"
-          />
-          <v-btn variant="tonal" size="small" prepend-icon="systemIcons:iconImport" class="mb-3" @click="pickFile">
-            Выбрать…
-          </v-btn>
-          <v-checkbox v-model="importOpts.tasks" label="Задачи" density="compact" hide-details />
-          <v-checkbox v-model="importOpts.tags" label="Теги" density="compact" hide-details />
-          <v-checkbox v-model="importOpts.clients" label="Клиенты" density="compact" hide-details />
-          <v-checkbox v-model="importOpts.users" label="Пользователи" density="compact" hide-details />
-        </template>
-      </v-card-text>
-
-      <v-card-actions>
-        <v-spacer />
-        <v-btn variant="text" @click="emit('close')">Закрыть</v-btn>
-        <template v-if="tab === 'export'">
-          <v-btn color="primary" variant="flat" prepend-icon="systemIcons:iconExport" :disabled="busy" @click="doExport">
-            Экспорт…
-          </v-btn>
-        </template>
-        <template v-else>
-          <v-btn color="primary" variant="flat" prepend-icon="systemIcons:iconImport" :disabled="busy || !importOpts.path" @click="doImport">
-            Импортировать…
-          </v-btn>
-        </template>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
+      </template>
+      <template v-else>
+        <v-btn color="primary" variant="flat" prepend-icon="systemIcons:iconImport" :disabled="busy || !importOpts.path" @click="doImport">
+          Импортировать…
+        </v-btn>
+      </template>
+    </template>
+  </BaseModal>
 </template>

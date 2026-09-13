@@ -2,6 +2,7 @@
 import { reactive, computed, ref } from "vue";
 import { useAppStore } from "../../store.js";
 import RangesModal from "../RangesModal.vue";
+import BaseModal from "../BaseModal.vue";
 import { dateTimeRule, isDateTimeValid } from "../../dateRules.js";
 
 const store = useAppStore();
@@ -52,11 +53,6 @@ const title = computed(() =>
   form.mode === "new" ? "Новая задача" : `Задача ${form.taskId}`
 );
 
-const open = computed({
-  get: () => true,
-  set: () => onClose(),
-});
-
 function submit() {
   let datesDirty = false;
   if (form.start !== baseStart.value) {
@@ -98,7 +94,7 @@ function onRangesSave(lines) {
   }
   const sep = last.match(/[—–-]\s*(.*)$/);
   const en = sep ? sep[1].trim() : "";
-  if (!en || DT_RE.test(en) || /^\d{2}:\d{2}$/.test(en)) {
+  if (!en || isDateTimeValid(en) || /^\d{2}:\d{2}$/.test(en)) {
     form.end = en;
     baseEnd.value = en;
   }
@@ -106,17 +102,8 @@ function onRangesSave(lines) {
 </script>
 
 <template>
-  <v-dialog v-model="open" max-width="600" max-height="85vh">
-    <v-card class="modal-card">
-      <v-toolbar v-dialog-drag density="compact" color="primary">
-        <v-toolbar-title>{{ title }}</v-toolbar-title>
-        <v-spacer />
-        <v-btn icon variant="text" title="Закрыть" @click="onClose">
-          <v-icon>mdi-close</v-icon>
-        </v-btn>
-      </v-toolbar>
-      <v-card-text class="pt-5">
-        <div v-if="isEdit" class="d-flex ga-4 mb-3">
+  <BaseModal :title="title" @close="onClose">
+    <div v-if="isEdit" class="d-flex ga-4 mb-3">
           <v-autocomplete
             v-model="form.user"
             :items="store.users.map((u) => ({ title: u, value: u }))"
@@ -245,14 +232,12 @@ function onRangesSave(lines) {
           variant="outlined"
           prepend-inner-icon="mdi-comment-outline"
         />
-      </v-card-text>
-      <v-card-actions>
-        <v-spacer />
-        <v-btn variant="text" @click="onClose">Отмена</v-btn>
-        <v-btn color="primary" variant="flat" @click="submit">Сохранить</v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
+
+    <template #actions>
+      <v-btn variant="text" @click="onClose">Отмена</v-btn>
+      <v-btn color="primary" variant="flat" @click="submit">Сохранить</v-btn>
+    </template>
+  </BaseModal>
 
   <RangesModal
     v-if="showRanges"

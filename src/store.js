@@ -73,7 +73,7 @@ export const useAppStore = defineStore("app", {
     ready: false,
     loading: true,
     error: "",
-    settings: { username: "", grouping: "none", accentColor: DEFAULT_ACCENT_COLOR, ourCarColor: DEFAULT_OUR_CAR_COLOR, fontFamily: DEFAULT_TABLE_FONT_FAMILY, fontSize: DEFAULT_TABLE_FONT_SIZE },
+    settings: { username: "", grouping: "none", accentColor: DEFAULT_ACCENT_COLOR, ourCarColor: DEFAULT_OUR_CAR_COLOR, fontFamily: DEFAULT_TABLE_FONT_FAMILY, fontSize: DEFAULT_TABLE_FONT_SIZE, backupDir: "" },
     users: [],
     tags: [],
     clients: [],
@@ -111,6 +111,7 @@ export const useAppStore = defineStore("app", {
           ourCarColor: HEX_RE.test(s.settings?.our_car_color || "") ? s.settings.our_car_color : DEFAULT_OUR_CAR_COLOR,
           fontFamily: s.settings?.font_family && s.settings.font_family.trim() !== "" ? s.settings.font_family : DEFAULT_TABLE_FONT_FAMILY,
           fontSize: s.settings?.font_size >= 8 && s.settings.font_size <= 40 ? s.settings.font_size : DEFAULT_TABLE_FONT_SIZE,
+          backupDir: s.settings?.backup_dir || "",
           columns: s.settings?.columns || [],
         };
         this.columns = mergeColumnsFromBackend(s.settings?.columns);
@@ -304,6 +305,25 @@ export const useAppStore = defineStore("app", {
       const col = this.columns.find((c) => c.key === key);
       if (col) col.visible = !!visible;
       await this.persistColumns();
+    },
+
+    /** Установить пользовательский каталог бэкапов ("" = по умолчанию). */
+    async setBackupsDir(dir) {
+      const d = String(dir || "").trim();
+      await api.setBackupsDir(d);
+      this.settings.backupDir = d;
+      await this.refresh();
+    },
+
+    /** Путь каталога бэкапов по умолчанию. */
+    async getDefaultBackupsDir() {
+      return (await api.getDefaultBackupsDir()) || "";
+    },
+
+    /** Фактический каталог бэкапов (пользовательский либо по умолчанию). */
+    async effectiveBackupsDir() {
+      if (this.settings.backupDir) return this.settings.backupDir;
+      return this.getDefaultBackupsDir();
     },
   },
 });

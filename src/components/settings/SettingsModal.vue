@@ -5,6 +5,7 @@ import EntityPanel from "../EntityPanel.vue";
 import ColumnsTab from "./tabs/ColumnsTab.vue";
 import StatusesTab from "./tabs/StatusesTab.vue";
 import GeneralTab from "./tabs/GeneralTab.vue";
+import BaseModal from "../BaseModal.vue";
 
 const store = useAppStore();
 const emit = defineEmits(["close"]);
@@ -17,29 +18,14 @@ const curUser = computed({
   },
 });
 
-const open = computed({
-  get: () => true,
-  set: () => emit("close"),
-});
-
 async function onAction(kind, payload) {
   await store.saveEntity(kind, payload);
 }
 </script>
 
 <template>
-  <v-dialog v-model="open" width="960" height="80vh">
-    <v-card class="modal-card">
-      <v-toolbar v-dialog-drag density="compact" color="primary">
-        <v-toolbar-title>Настройки</v-toolbar-title>
-        <v-spacer />
-        <v-btn icon variant="text" title="Закрыть" @click="emit('close')">
-          <v-icon>mdi-close</v-icon>
-        </v-btn>
-      </v-toolbar>
-
-      <v-card-text class="pt-5">
-        <v-tabs v-model="tab" color="primary" class="mb-4">
+  <BaseModal title="Настройки" width="960" height="80vh" @close="emit('close')">
+    <v-tabs v-model="tab" color="primary" class="mb-4">
           <v-tab value="general">Общее</v-tab>
           <v-tab value="users">Пользователи</v-tab>
           <v-tab value="tags">Теги</v-tab>
@@ -75,12 +61,9 @@ async function onAction(kind, payload) {
         <div v-if="tab === 'tasks'">
           <ColumnsTab />
         </div>
-      </v-card-text>
 
-      <v-card-actions>
-        <v-spacer />
-        <v-btn color="primary" variant="flat" @click="emit('close')">Закрыть</v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
+    <template #actions>
+      <v-btn color="primary" variant="flat" @click="emit('close')">Закрыть</v-btn>
+    </template>
+  </BaseModal>
 </template>

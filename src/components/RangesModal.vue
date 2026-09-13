@@ -1,5 +1,6 @@
 <script setup>
 import { ref } from "vue";
+import BaseModal from "./BaseModal.vue";
 
 const props = defineProps({
   text: { type: String, default: "" },
@@ -47,41 +48,30 @@ function save() {
 </script>
 
 <template>
-  <v-dialog :model-value="true" width="720" height="65vh">
-    <v-card class="modal-card">
-      <v-toolbar v-dialog-drag density="compact" color="primary">
-        <v-toolbar-title>Временные диапазоны</v-toolbar-title>
-        <v-spacer />
-        <v-btn icon variant="text" title="Закрыть" @click="emit('close')">
-          <v-icon>mdi-close</v-icon>
-        </v-btn>
-      </v-toolbar>
-      <v-card-text class="pa-4 flex-grow-1 d-flex flex-column">
-        <div class="text-caption text-medium-emphasis mb-2">
-          По строке: «дд.мм.гггг мм:чч — дд.мм.гггг мм:чч» (или просто «дд.мм.гггг мм:чч» — открытый).
-          Завершение можно не заполнять.
-        </div>
-        <v-textarea
-          v-model="localText"
-          rows="12"
-          variant="outlined"
-          density="compact"
-          class="ranges-textarea flex-grow-1"
-          hide-details
-          autofocus
-          @keydown.esc="emit('close')"
-        />
-        <v-alert v-if="error" type="error" density="compact" class="mt-3">
-          {{ error }}
-        </v-alert>
-      </v-card-text>
-      <v-card-actions>
-        <v-spacer />
-        <v-btn variant="text" @click="emit('close')">Отмена</v-btn>
-        <v-btn color="primary" variant="flat" @click="save">Сохранить</v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
+  <BaseModal title="Временные диапазоны" width="720" height="65vh" body-class="pa-4 flex-grow-1 d-flex flex-column" @close="emit('close')">
+    <div class="text-caption text-medium-emphasis mb-2">
+      По строке: «дд.мм.гггг мм:чч — дд.мм.гггг мм:чч» (или просто «дд.мм.гггг мм:чч» — открытый).
+      Завершение можно не заполнять.
+    </div>
+    <v-textarea
+      v-model="localText"
+      rows="12"
+      variant="outlined"
+      density="compact"
+      class="ranges-textarea flex-grow-1"
+      hide-details
+      autofocus
+      @keydown.esc="emit('close')"
+    />
+    <v-alert v-if="error" type="error" density="compact" class="mt-3">
+      {{ error }}
+    </v-alert>
+
+    <template #actions>
+      <v-btn variant="text" @click="emit('close')">Отмена</v-btn>
+      <v-btn color="primary" variant="flat" @click="save">Сохранить</v-btn>
+    </template>
+  </BaseModal>
 </template>
 
 <style scoped>

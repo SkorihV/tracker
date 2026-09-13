@@ -1,5 +1,6 @@
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
+import { open } from "@tauri-apps/plugin-dialog";
 import { useAppStore, DEFAULT_ACCENT_COLOR, DEFAULT_OUR_CAR_COLOR, DEFAULT_TABLE_FONT_FAMILY, DEFAULT_TABLE_FONT_SIZE } from "../../../store.js";
 
 const store = useAppStore();
@@ -78,6 +79,29 @@ function resetFontDefault() {
   fontFamily.value = DEFAULT_TABLE_FONT_FAMILY;
   fontSize.value = DEFAULT_TABLE_FONT_SIZE;
   store.setTableFont(DEFAULT_TABLE_FONT_FAMILY, DEFAULT_TABLE_FONT_SIZE);
+}
+
+const defaultBackupsPath = ref("");
+const backupsPath = ref("");
+
+onMounted(async () => {
+  defaultBackupsPath.value = await store.getDefaultBackupsDir();
+  const effective = await store.effectiveBackupsDir();
+  backupsPath.value = effective;
+});
+
+async function pickBackupsDir() {
+  const picked = await open({ directory: true, multiple: false });
+  if (picked) {
+    const p = String(picked);
+    await store.setBackupsDir(p);
+    backupsPath.value = p;
+  }
+}
+
+async function resetBackupsDir() {
+  await store.setBackupsDir(defaultBackupsPath.value);
+  backupsPath.value = defaultBackupsPath.value;
 }
 </script>
 
@@ -195,6 +219,31 @@ function resetFontDefault() {
       <span class="text-caption text-medium-emphasis" :style="{ fontFamily: fontFamily, fontSize: fontSize + 'px' }">
         Пример: АаБбь 0Oo 12345
       </span>
+    </div>
+
+    <v-divider />
+
+    <div class="d-flex flex-column ga-3">
+      <span class="text-body-2">Папка бэкапов:</span>
+      <div class="d-flex align-center ga-3 flex-wrap">
+        <span
+          class="mono text-caption text-medium-emphasis flex-grow-1"
+          style="min-width: 160px; max-width: 420px; overflow-wrap: anywhere"
+        >
+          {{ backupsPath || "…" }}
+        </span>
+        <v-btn variant="tonal" density="compact" prepend-icon="systemIcons:iconFolder" @click="pickBackupsDir">
+          Выбрать…
+        </v-btn>
+        <v-btn
+          variant="tonal"
+          density="compact"
+          :disabled="!store.settings.backupDir"
+          @click="resetBackupsDir"
+        >
+          По умолчанию
+        </v-btn>
+      </div>
     </div>
   </div>
 </template>

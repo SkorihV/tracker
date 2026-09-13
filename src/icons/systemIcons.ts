@@ -8,6 +8,7 @@ import iconClose from './main/iconClose.vue'
 import iconCog from './main/iconCog.vue'
 import iconEdit from './main/iconEdit.vue'
 import iconExport from './main/iconExport.vue'
+import iconFolder from './main/iconFolder.vue'
 import iconImport from './main/iconImport.vue'
 import iconPause from './main/iconPause.vue'
 import iconPlay from './main/iconPlay.vue'
@@ -28,6 +29,7 @@ const mapNameToComponent: any = {
     iconCog,
     iconEdit,
     iconExport,
+    iconFolder,
     iconImport,
     iconPause,
     iconPlay,

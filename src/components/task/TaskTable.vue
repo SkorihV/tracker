@@ -1,7 +1,6 @@
 <script setup>
 import { computed, defineModel } from "vue";
 import { useAppStore } from "../../store.js";
-import { fmtTd } from "../../api.js";
 import TaskActions from "./TaskActions.vue";
 import TaskComment from "./TaskComment.vue";
 import TaskTime from "./TaskTime.vue";
@@ -9,7 +8,8 @@ import TaskStart from "./TaskStart.vue";
 import TaskEnd from "./TaskEnd.vue";
 import TaskTags from "./TaskTags.vue";
 import TaskStatus from "./TaskStatus.vue";
-import { statusHex, statusTextHex } from "../../statusColors.js";
+import TaskOurCar from "./TaskOurCar.vue";
+import TaskGroupHeader from "./TaskGroupHeader.vue";
 import TaskNoData from "./TaskNoData.vue";
 import TaskMode from "./TaskMode.vue";
 
@@ -41,20 +41,6 @@ const selectedArray = computed({
   get: () => Array.from(selectedIds.value || new Set()),
   set: (v) => { selectedIds.value = new Set(v || []) },
 })
-
-function groupLabel(item) {
-  if (item.key === "_day") {
-    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(item.value || "")
-    return m ? `${m[3]}.${m[2]}.${m[1]}` : item.value || "—"
-  }
-  return item.value || "(не указан)"
-}
-
-function groupTime(item) {
-  const tasks = (item.items || []).map((x) => (x && x.raw ? x.raw : x))
-  const total = tasks.reduce((s, t) => s + (t.seconds || 0), 0)
-  return { count: tasks.length, time: fmtTd(total) }
-}
 
 function editTask(_e, row) {
   emit('edit', row.item)
@@ -132,19 +118,12 @@ const tableStyle = computed(() => ({
     @dblclick:row="editTask"
   >
     <template #group-header="{ item, columns, toggleGroup, isGroupOpen }">
-      <tr class="task-group-row">
-        <td :colspan="columns.length">
-          <div class="d-flex align-center ga-1">
-            <v-btn icon size="x-small" variant="text" density="default" @click="toggleGroup(item)">
-              <v-icon size="x-large">{{ isGroupOpen(item) ? 'mdi-chevron-down' : 'mdi-chevron-right' }}</v-icon>
-            </v-btn>
-            <span class="font-weight-bold text-body-2">{{ groupLabel(item) }}</span>
-            <span class="text-medium-emphasis text-caption ml-1">
-              {{ groupTime(item).count }} задач · {{ groupTime(item).time }}
-            </span>
-          </div>
-        </td>
-      </tr>
+      <task-group-header
+        :item="item"
+        :columns="columns"
+        :toggle-group="toggleGroup"
+        :is-group-open="isGroupOpen"
+      />
     </template>
     <template #header.data-table-group>
       <v-icon size="small">mdi-view-agenda</v-icon>
@@ -203,16 +182,7 @@ const tableStyle = computed(() => ({
     </template>
 
     <template #item.ourCar="{item}">
-      <v-sheet
-        v-if="item.ourCar"
-        height="100%"
-        width="100%"
-        min-width="60px"
-        class="pa-2 our-car-cell d-flex align-center justify-center"
-        :style="{ backgroundColor: statusHex(store.settings.ourCarColor), color: statusTextHex(store.settings.ourCarColor) }"
-      >
-        <v-icon icon="mdi-car" title="Наша машина" />
-      </v-sheet>
+      <task-our-car :task="item"></task-our-car>
     </template>
 
     <template #item.mode="{item}">
@@ -236,8 +206,4 @@ const tableStyle = computed(() => ({
   min-width: 100%;
 }
 
-.task-table .task-group-row td {
-  background: #eceef2;
-  font-weight: 600;
-}
 </style>

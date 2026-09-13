@@ -33,16 +33,16 @@ export const api = {
   /** Предпросмотр отчёта (данные на экране, без записи файла). */
   reportPreview: (filter) => call("report_preview", { filter: cleanFilter(filter) }),
 
-  /** Сформировать файл отчёта. Возвращает путь к созданному файлу. */
-  createReport: (format, filter, dateFrom, dateTo) =>
-    call("create_report", { format, filter: cleanFilter(filter), dateFrom, dateTo }),
+  /** Сформировать файл отчёта. path (необязательно) — куда сохранить; иначе reports/. Возвращает путь. */
+  createReport: (format, filter, dateFrom, dateTo, path = "") =>
+    call("create_report", { format, filter: cleanFilter(filter), dateFrom, dateTo, path }),
 
   /** Предпросмотр статистики (на экран, без записи файла). */
   statsPreview: (filter) => call("stats_preview", { filter: cleanFilter(filter) }),
 
-  /** Сформировать файл статистики. Возвращает путь к созданному файлу. */
-  createStats: (format, filter, dateFrom, dateTo) =>
-    call("create_stats", { format, filter: cleanFilter(filter), dateFrom, dateTo }),
+  /** Сформировать файл статистики. path (необязательно) — куда сохранить; иначе reports/. Возвращает путь. */
+  createStats: (format, filter, dateFrom, dateTo, path = "") =>
+    call("create_stats", { format, filter: cleanFilter(filter), dateFrom, dateTo, path }),
 
   /** Экспортировать данные в JSON-файл по указанному пути. */
   exportJson: (path, opts) =>
@@ -102,6 +102,12 @@ export const api = {
   setTableFont: (family, size) => call("set_table_font", { family, size }),
   /** Сохранить порядок и видимость колонок таблицы. */
   setColumns: (columns) => call("set_columns", { columns }),
+
+  /** Сохранить пользовательский каталог бэкапов ("" = по умолчанию). */
+  setBackupsDir: (dir) => call("set_backups_dir", { dir }),
+
+  /** Получить путь бэкапов по умолчанию. */
+  getDefaultBackupsDir: () => call("default_backups_dir"),
 
   /** Добавить пользователя в справочник. */
   addUser: (name) => call("add_user", { name }),
