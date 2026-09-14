@@ -44,7 +44,7 @@ defineOptions({name:'TaskGroupHeader'})
 
 <style lang="scss">
 .task-table .task-group-row td {
-  background: #eceef2;
+  background: rgb(var(--v-theme-surface-variant));
   font-weight: 600;
 }
 </style>

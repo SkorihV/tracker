@@ -13,8 +13,19 @@ const HEX_RE = /^#[0-9a-fA-F]{6}$/
 function applyAccentToTheme(color) {
   const c = HEX_RE.test(color || "") ? color : DEFAULT_ACCENT_COLOR
   try {
-    const light = vuetify?.theme?.themes?.value?.light
-    if (light && light.colors) light.colors.primary = c
+    const themes = vuetify?.theme?.themes?.value
+    if (themes?.light?.colors) themes.light.colors.primary = c
+    if (themes?.dark?.colors) themes.dark.colors.primary = c
+  } catch {
+    /* ignore */
+  }
+}
+
+function applyTheme(name) {
+  const t = name === "dark" ? "dark" : "light"
+  try {
+    if (vuetify?.theme?.change) vuetify.theme.change(t)
+    else if (vuetify?.theme?.global?.name) vuetify.theme.global.name.value = t
   } catch {
     /* ignore */
   }
@@ -73,13 +84,26 @@ export const useAppStore = defineStore("app", {
     ready: false,
     loading: true,
     error: "",
-    settings: { username: "", grouping: "none", accentColor: DEFAULT_ACCENT_COLOR, ourCarColor: DEFAULT_OUR_CAR_COLOR, fontFamily: DEFAULT_TABLE_FONT_FAMILY, fontSize: DEFAULT_TABLE_FONT_SIZE, backupDir: "" },
+    settings: {
+      username: "",
+      grouping: "none",
+      accentColor: DEFAULT_ACCENT_COLOR,
+      ourCarColor: DEFAULT_OUR_CAR_COLOR,
+      fontFamily: DEFAULT_TABLE_FONT_FAMILY,
+      fontSize: DEFAULT_TABLE_FONT_SIZE,
+      backupDir: "",
+      theme: "light"
+    },
     users: [],
     tags: [],
     clients: [],
     statuses: [],
     rows: [],
-    totals: { count: 0, totalSeconds: 0, timeLabel: "00:00:00", byTag: [] },
+    totals: {
+      count: 0,
+      totalSeconds: 0,
+      timeLabel: "00:00:00",
+      byTag: [] },
     filter: {
       dateFrom: today(),
       dateTo: today(),
@@ -112,6 +136,7 @@ export const useAppStore = defineStore("app", {
           fontFamily: s.settings?.font_family && s.settings.font_family.trim() !== "" ? s.settings.font_family : DEFAULT_TABLE_FONT_FAMILY,
           fontSize: s.settings?.font_size >= 8 && s.settings.font_size <= 40 ? s.settings.font_size : DEFAULT_TABLE_FONT_SIZE,
           backupDir: s.settings?.backup_dir || "",
+          theme: s.settings?.theme === "dark" ? "dark" : "light",
           columns: s.settings?.columns || [],
         }
         this.columns = mergeColumnsFromBackend(s.settings?.columns)
@@ -121,6 +146,7 @@ export const useAppStore = defineStore("app", {
         this.statuses = s.statuses || []
         this.error = ""
         applyAccentToTheme(this.settings.accentColor)
+        applyTheme(this.settings.theme)
       } catch (e) {
         this.error = String(e)
       }
@@ -305,6 +331,15 @@ export const useAppStore = defineStore("app", {
       const col = this.columns.find((c) => c.key === key)
       if (col) col.visible = !!visible
       await this.persistColumns()
+    },
+
+    /** Изменить тему оформления ("light" | "dark"). */
+    async setTheme(theme) {
+      const t = theme === "dark" ? "dark" : "light"
+      await api.setTheme(t)
+      this.settings.theme = t
+      applyTheme(t)
+      await this.refreshQuery()
     },
 
     /** Установить пользовательский каталог бэкапов ("" = по умолчанию). */

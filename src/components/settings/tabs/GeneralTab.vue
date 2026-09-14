@@ -223,6 +223,27 @@ async function resetBackupsDir() {
 
     <v-divider />
 
+    <div class="d-flex align-center ga-3 flex-wrap">
+      <span class="text-body-2">Тема оформления:</span>
+      <v-switch
+        :model-value="store.settings.theme === 'dark'"
+        label="Тёмная"
+        density="compact"
+        hide-details
+        color="primary"
+        @update:model-value="store.setTheme($event ? 'dark' : 'light')"
+      />
+      <v-btn
+        variant="tonal"
+        :disabled="store.settings.theme === 'light'"
+        @click="store.setTheme('light')"
+      >
+        Светлая
+      </v-btn>
+    </div>
+
+    <v-divider />
+
     <div class="d-flex flex-column ga-3">
       <span class="text-body-2">Папка бэкапов:</span>
       <div class="d-flex align-center ga-3 flex-wrap">

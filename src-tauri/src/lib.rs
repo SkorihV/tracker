@@ -243,6 +243,14 @@ fn set_our_car_color(s: State<'_, AppStore>, color: String) -> Result<(), String
 }
 
 #[tauri::command]
+fn set_theme(s: State<'_, AppStore>, theme: String) -> Result<(), String> {
+    s.0.lock()
+        .map_err(|e| e.to_string())?
+        .set_theme(theme);
+    Ok(())
+}
+
+#[tauri::command]
 fn set_table_font(s: State<'_, AppStore>, family: String, size: u32) -> Result<(), String> {
     s.0.lock()
         .map_err(|e| e.to_string())?
@@ -441,6 +449,7 @@ pub fn run() {
             remove_tasks,
             set_settings,
             set_our_car_color,
+            set_theme,
             set_table_font,
             set_columns,
             set_backups_dir,

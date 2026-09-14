@@ -852,6 +852,15 @@ pub fn import_json_file(
         self.save();
     }
 
+    /// Сохранить тему оформления ("light" | "dark").
+    pub fn set_theme(&mut self, theme: String) {
+        let theme = theme.trim().to_string();
+        if theme == "light" || theme == "dark" {
+            self.settings.theme = theme;
+            self.save();
+        }
+    }
+
     /// Сохранить цвет ячейки «Наша машина».
     pub fn set_our_car_color(&mut self, color: String) {
         let color = color.trim().to_string();

@@ -42,6 +42,7 @@ pub struct Settings {
     pub font_size: u32, // размер шрифта таблицы задач (px)
     pub columns: Vec<ColumnPref>, // порядок и видимость колонок таблицы
     pub backup_dir: String, // пользовательский каталог бэкапов ("") = по умолчанию
+    pub theme: String, // тема оформления: "light" | "dark"
 }
 
 impl Default for Settings {
@@ -55,6 +56,7 @@ impl Default for Settings {
             font_size: 14,
             columns: Vec::new(),
             backup_dir: String::new(),
+            theme: "light".into(),
         }
     }
 }
@@ -98,6 +100,11 @@ impl Settings {
             .and_then(|x| x.as_str())
             .unwrap_or("")
             .to_string();
+        let theme = obj
+            .and_then(|o| o.get("theme"))
+            .and_then(|x| x.as_str())
+            .unwrap_or("light")
+            .to_string();
         Settings {
             username: obj
                 .and_then(|o| o.get("username"))
@@ -111,6 +118,7 @@ impl Settings {
             font_size,
             columns,
             backup_dir,
+            theme,
         }
     }
 
@@ -124,6 +132,7 @@ impl Settings {
             "font_size": self.font_size,
             "columns": self.columns,
             "backup_dir": self.backup_dir,
+            "theme": self.theme,
         })
     }
 }

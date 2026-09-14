@@ -20,8 +20,14 @@ export default createVuetify({
     VCombobox: { autocomplete: "suppress" },
   },
   theme: {
+    defaultTheme: "light",
     themes: {
       light: {
+        colors: {
+          primary: "#4caf50",
+        },
+      },
+      dark: {
         colors: {
           primary: "#4caf50",
         },

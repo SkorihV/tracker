@@ -100,6 +100,9 @@ export const api = {
   setOurCarColor: (color) => call("set_our_car_color", { color }),
   /** Сохранить вид и размер шрифта таблицы задач. */
   setTableFont: (family, size) => call("set_table_font", { family, size }),
+  /** Сохранить тему оформления ("light" | "dark"). */
+  setTheme: (theme) => call("set_theme", { theme }),
+
   /** Сохранить порядок и видимость колонок таблицы. */
   setColumns: (columns) => call("set_columns", { columns }),
 
