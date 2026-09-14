@@ -178,7 +178,7 @@ fn store_mutations() {
 
 let t = st.create_task(TaskDraft {
         user: "Второй".into(),
-        order: "R-3".into(),
+        orders: vec!["R-3".into()],
         tags: vec![],
         client: "".into(),
         comment: "".into(),
@@ -199,10 +199,10 @@ let t = st.create_task(TaskDraft {
 
     st.update_task(
         &t.task_id,
-        TaskDraft { user: "Второй".into(), order: "R-2".into(), tags: vec!["Тонкий".into()], client: "Клиент 1".into(), comment: "".into(), custom_status: "".into(), our_car: false },
+        TaskDraft { user: "Второй".into(), orders: vec!["R-2".into()], tags: vec!["Тонкий".into()], client: "Клиент 1".into(), comment: "".into(), custom_status: "".into(), our_car: false },
     );
     let last = st.tasks.last().unwrap();
-    assert_eq!(last.order, "R-2");
+    assert_eq!(last.orders, vec!["R-2".to_string()]);
     assert_eq!(last.tags, vec!["Тонкий"]);
     assert!(st.users.iter().any(|u| u == "Второй"), "пользователь добавляется автоматически");
 
@@ -223,7 +223,7 @@ fn dates_and_intervals() {
 
 let t = st.create_task(TaskDraft {
         user: "Автодопользователь".into(),
-        order: "R-2".into(),
+        orders: vec!["R-2".into()],
         tags: vec![]
             .into_iter().collect(),
         client: "".into(),
@@ -290,7 +290,7 @@ let t = st.create_task(TaskDraft {
 
 let t2 = st.create_task(TaskDraft {
                             user: "Второй".into(),
-                            order: "R-2".into(),
+                            orders: vec!["R-2".into()],
                             tags: vec![],
                             client: "".into(),
                             comment: "".into(),
@@ -324,7 +324,7 @@ fn tags_and_statuses() {
 
     let t = st.create_task(TaskDraft {
         user: "Тест".into(),
-        order: "R-1".into(),
+        orders: vec!["R-1".into()],
         tags: vec!["Альфа".into(), "Бета".into()],
         client: "".into(),
         comment: "".into(),

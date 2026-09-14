@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from "vue"
+import { ref, computed, watch } from "vue"
 import { save } from "@tauri-apps/plugin-dialog"
 import { api } from "../api"
 import { useAppStore } from "../store"
@@ -9,6 +9,28 @@ import ReportPeriodFields from "./ReportPeriodFields.vue"
 
 const store = useAppStore()
 const emit = defineEmits(["close"])
+
+// Колонки предпросмотра — как в таблице Задач (без служебной «Действия»).
+const PREVIEW_COLUMNS = {
+  time: { title: "Время", cell: (r) => r.elapsedLabel, mono: true },
+  status: { title: "Статус", cell: (r) => r.customStatus },
+  ourCar: { title: "Наша машина", cell: (r) => (r.ourCar ? "Да" : "") },
+  mode: { title: "Режим", cell: (r) => r.mode },
+  order: { title: "Заявка", cell: (r) => r.order },
+  client: { title: "Клиент", cell: (r) => r.client },
+  tags: { title: "Тег", cell: (r) => (r.tags || []).join(", ") },
+  start: { title: "Начало", cell: (r) => r.start, mono: true },
+  end: { title: "Завершение", cell: (r) => r.end, mono: true },
+  user: { title: "Пользователь", cell: (r) => r.user },
+  comment: { title: "Комментарий", cell: (r) => r.comment },
+  taskId: { title: "ID", cell: (r) => r.taskId },
+}
+
+const previewColumns = computed(() =>
+  store.visibleColumns
+    .filter((c) => c.key !== "actions" && PREVIEW_COLUMNS[c.key])
+    .map((c) => PREVIEW_COLUMNS[c.key])
+)
 
 const format = ref("xlsx")
 const dateFrom = ref(store.filter.dateFrom || today())
@@ -86,26 +108,12 @@ loadPreview()
       <v-table density="compact" class="max-width-table">
         <thead>
           <tr>
-            <th>Начало</th>
-            <th>Конец</th>
-            <th>Пользователь</th>
-            <th>Заявка</th>
-            <th>Клиент</th>
-            <th>Тег</th>
-            <th>Время</th>
-            <th>Комментарий</th>
+            <th v-for="col in previewColumns" :key="col.title">{{ col.title }}</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="r in preview.rows" :key="r.taskId">
-            <td class="mono">{{ r.start }}</td>
-            <td class="mono">{{ r.end }}</td>
-            <td>{{ r.user }}</td>
-            <td>{{ r.order }}</td>
-            <td>{{ r.client }}</td>
-            <td>{{ (r.tags || []).join(", ") }}</td>
-            <td class="mono">{{ r.elapsedLabel }}</td>
-            <td class="comment-cell">{{ r.comment }}</td>
+            <td v-for="col in previewColumns" :key="col.title" :class="{ mono: col.mono }">{{ col.cell(r) }}</td>
           </tr>
         </tbody>
       </v-table>

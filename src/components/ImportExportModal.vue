@@ -16,6 +16,7 @@ const exportOpts = reactive({
   tags: true,
   clients: true,
   users: true,
+  statuses: true,
 })
 
 const importOpts = reactive({
@@ -24,6 +25,7 @@ const importOpts = reactive({
   tags: true,
   clients: true,
   users: true,
+  statuses: true,
 })
 
 const busy = ref(false)
@@ -45,6 +47,7 @@ async function doExport() {
       tags: exportOpts.tags,
       clients: exportOpts.clients,
       users: exportOpts.users,
+      statuses: exportOpts.statuses,
     })
     notice.value = `Экспортировано: ${path}`
   } catch (e) {
@@ -76,6 +79,7 @@ async function doImport() {
       tags: importOpts.tags,
       clients: importOpts.clients,
       users: importOpts.users,
+      statuses: importOpts.statuses,
     })
     await store.refresh()
     await store.refreshQuery()
@@ -110,6 +114,7 @@ async function doImport() {
       <v-checkbox v-model="exportOpts.tags" label="Теги" density="compact" hide-details />
       <v-checkbox v-model="exportOpts.clients" label="Клиенты" density="compact" hide-details />
       <v-checkbox v-model="exportOpts.users" label="Пользователи" density="compact" hide-details />
+      <v-checkbox v-model="exportOpts.statuses" label="Статусы" density="compact" hide-details />
     </template>
 
     <template v-else>
@@ -133,6 +138,7 @@ async function doImport() {
       <v-checkbox v-model="importOpts.tags" label="Теги" density="compact" hide-details />
       <v-checkbox v-model="importOpts.clients" label="Клиенты" density="compact" hide-details />
       <v-checkbox v-model="importOpts.users" label="Пользователи" density="compact" hide-details />
+      <v-checkbox v-model="importOpts.statuses" label="Статусы" density="compact" hide-details />
     </template>
 
     <template #actions>

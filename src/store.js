@@ -10,6 +10,44 @@ export const DEFAULT_TABLE_FONT_SIZE = 14
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/
 
+function readCookie(name) {
+  try {
+    const m = document.cookie
+      .split(";")
+      .map((s) => s.trim())
+      .find((s) => s.startsWith(`${name}=`))
+    return m ? decodeURIComponent(m.slice(name.length + 1)) : ""
+  } catch {
+    return ""
+  }
+}
+
+function writeCookie(name, value, maxAge = 31536000) {
+  try {
+    document.cookie = `${name}=${encodeURIComponent(value)};path=/;max-age=${maxAge}`
+  } catch {
+    /* ignore */
+  }
+}
+
+function readFontFamily() {
+  const v = readCookie("tt_font")
+  return v && v.trim() !== "" ? v : DEFAULT_TABLE_FONT_FAMILY
+}
+
+function readFontSize() {
+  const n = Number(readCookie("tt_fontsize"))
+  return Number.isInteger(n) && n >= 8 && n <= 40 ? n : DEFAULT_TABLE_FONT_SIZE
+}
+
+function readTheme() {
+  return readCookie("tt_theme") === "dark" ? "dark" : "light"
+}
+
+function saveTheme(name) {
+  writeCookie("tt_theme", name === "dark" ? "dark" : "light")
+}
+
 function applyAccentToTheme(color) {
   const c = HEX_RE.test(color || "") ? color : DEFAULT_ACCENT_COLOR
   try {
@@ -38,7 +76,7 @@ function defaultColumns() {
     { key: "ourCar", label: "Наша машина", visible: true, width: '' },
     { key: "actions", label: "Действия", visible: true, width: '' },
     { key: "mode", label: "Режим", visible: true, width: '' },
-    { key: "order", label: "Заявка", visible: true, width: '' },
+    { key: "order", label: "Заявка", visible: true, width: '500px' },
     { key: "client", label: "Клиент", visible: true, width: '' },
     { key: "tags", label: "Тег", visible: true, width: '' },
     { key: "start", label: "Начало", visible: true, width: '180px' },
@@ -89,10 +127,10 @@ export const useAppStore = defineStore("app", {
       grouping: "none",
       accentColor: DEFAULT_ACCENT_COLOR,
       ourCarColor: DEFAULT_OUR_CAR_COLOR,
-      fontFamily: DEFAULT_TABLE_FONT_FAMILY,
-      fontSize: DEFAULT_TABLE_FONT_SIZE,
+      fontFamily: readFontFamily(),
+      fontSize: readFontSize(),
       backupDir: "",
-      theme: "light"
+      theme: readTheme()
     },
     users: [],
     tags: [],
@@ -133,10 +171,10 @@ export const useAppStore = defineStore("app", {
           grouping: s.settings?.grouping || "none",
           accentColor: HEX_RE.test(s.settings?.accent_color || "") ? s.settings.accent_color : DEFAULT_ACCENT_COLOR,
           ourCarColor: HEX_RE.test(s.settings?.our_car_color || "") ? s.settings.our_car_color : DEFAULT_OUR_CAR_COLOR,
-          fontFamily: s.settings?.font_family && s.settings.font_family.trim() !== "" ? s.settings.font_family : DEFAULT_TABLE_FONT_FAMILY,
-          fontSize: s.settings?.font_size >= 8 && s.settings.font_size <= 40 ? s.settings.font_size : DEFAULT_TABLE_FONT_SIZE,
+          fontFamily: readFontFamily(),
+          fontSize: readFontSize(),
           backupDir: s.settings?.backup_dir || "",
-          theme: s.settings?.theme === "dark" ? "dark" : "light",
+          theme: readTheme(),
           columns: s.settings?.columns || [],
         }
         this.columns = mergeColumnsFromBackend(s.settings?.columns)
@@ -173,7 +211,7 @@ export const useAppStore = defineStore("app", {
       await this.refreshQuery()
     },
 
-    /** Изменить акцентный цвет кнопок и заголовков. */
+    /** Изменить акцентный цвет кнопок и заголовков. Сохраняется на сервере. */
     async setAccentColor(color) {
       const c = HEX_RE.test(color || "") ? color : DEFAULT_ACCENT_COLOR
       await api.setSettings(this.settings.username, this.settings.grouping, c)
@@ -182,7 +220,7 @@ export const useAppStore = defineStore("app", {
       await this.refreshQuery()
     },
 
-    /** Изменить цвет ячейки «Наша машина». */
+    /** Изменить цвет ячейки «Наша машина». Сохраняется на сервере. */
     async setOurCarColor(color) {
       const c = HEX_RE.test(color || "") ? color : DEFAULT_OUR_CAR_COLOR
       await api.setOurCarColor(c)
@@ -190,15 +228,15 @@ export const useAppStore = defineStore("app", {
       await this.refreshQuery()
     },
 
-    /** Изменить вид и размер шрифта таблицы задач. */
-    async setTableFont(family, size) {
+    /** Изменить вид и размер шрифта таблицы задач. Хранится в cookie (без перезагрузки данных). */
+    setTableFont(family, size) {
       const f = String(family || "").trim() || DEFAULT_TABLE_FONT_FAMILY
       const s = Number(size)
       const sz = Number.isInteger(s) && s >= 8 && s <= 40 ? s : DEFAULT_TABLE_FONT_SIZE
-      await api.setTableFont(f, sz)
+      writeCookie("tt_font", f)
+      writeCookie("tt_fontsize", String(sz))
       this.settings.fontFamily = f
       this.settings.fontSize = sz
-      await this.refreshQuery()
     },
 
     async addTask(draft) {
@@ -333,13 +371,12 @@ export const useAppStore = defineStore("app", {
       await this.persistColumns()
     },
 
-    /** Изменить тему оформления ("light" | "dark"). */
-    async setTheme(theme) {
+    /** Изменить тему оформления ("light" | "dark"). Хранится в cookie, не в данных. */
+    setTheme(theme) {
       const t = theme === "dark" ? "dark" : "light"
-      await api.setTheme(t)
       this.settings.theme = t
+      saveTheme(t)
       applyTheme(t)
-      await this.refreshQuery()
     },
 
     /** Установить пользовательский каталог бэкапов ("" = по умолчанию). */

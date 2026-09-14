@@ -1,7 +1,8 @@
 <script setup>
-import { reactive, computed, ref } from "vue"
+import { reactive, computed, ref, nextTick } from "vue"
 import { useAppStore } from "../../store.js"
 import RangesModal from "../RangesModal.vue"
+import ConfirmDialog from "../ConfirmDialog.vue"
 import BaseModal from "../BaseModal.vue"
 import { dateTimeRule, isDateTimeValid } from "../../dateRules.js"
 
@@ -25,7 +26,8 @@ const form = reactive({
   mode: props.draft.mode,
   taskId: props.draft.taskId || "",
   user: props.draft.user || store.settings.username || "",
-  order: props.draft.order || "",
+  orders: [...(props.draft.orders || [])],
+  orderInput: "",
   tags: props.draft.tags || [],
   customStatus: props.draft.customStatus || "",
   ourCar: props.draft.ourCar || false,
@@ -34,6 +36,42 @@ const form = reactive({
   start: props.draft.start || (isEdit ? "" : nowLabel()),
   end: props.draft.end || "",
 })
+
+// --- Список номеров заявок (как справочник клиентов) ---
+const editingOrder = ref(null)
+const editOrderName = ref("")
+const orderEditInputs = {}
+const pendingClearOrders = ref(false)
+
+function addOrder() {
+  const val = form.orderInput.trim()
+  if (!val) return
+  if (!form.orders.includes(val)) form.orders.push(val)
+  form.orderInput = ""
+}
+
+function removeOrder(i) {
+  form.orders.splice(i, 1)
+  if (editingOrder.value === i) cancelOrderEdit()
+}
+
+function startOrderEdit(i) {
+  editingOrder.value = i
+  editOrderName.value = form.orders[i]
+  nextTick(() => orderEditInputs[i]?.focus())
+}
+
+function cancelOrderEdit() {
+  editingOrder.value = null
+}
+
+function saveOrderEdit(i) {
+  const val = editOrderName.value.trim()
+  if (val && val !== form.orders[i] && !form.orders.some((x, j) => j !== i && x === val)) {
+    form.orders[i] = val
+  }
+  cancelOrderEdit()
+}
 
 const baseStart = ref(form.start)
 const baseEnd = ref(form.end)
@@ -103,135 +141,192 @@ function onRangesSave(lines) {
 
 <template>
   <BaseModal :title="title" @close="onClose">
-    <div v-if="isEdit" class="d-flex ga-4 mb-3">
-          <v-autocomplete
-            v-model="form.user"
-            :items="store.users.map((u) => ({ title: u, value: u }))"
-            label="Пользователь"
-            density="compact"
-            variant="outlined"
-            prepend-inner-icon="systemIcons:iconUser"
-            class="flex-grow-1"
-          />
-        </div>
         <v-autocomplete
-          v-else
           v-model="form.user"
           :items="store.users.map((u) => ({ title: u, value: u }))"
           label="Пользователь"
           density="compact"
           variant="outlined"
           prepend-inner-icon="systemIcons:iconUser"
-          class="mb-3"
+
         />
-        <v-text-field
-          v-model="form.order"
-          label="Номер заявки (заказ)"
-          placeholder="например 12345"
-          density="compact"
-          variant="outlined"
-          prepend-inner-icon="mdi-clipboard-text-outline"
-          class="mb-3"
-        />
-        <div class="d-flex ga-4 mb-3">
-          <v-autocomplete
-            v-model="form.tags"
-            :items="store.tags.map((t) => ({ title: t.name, value: t.name }))"
-            label="Теги"
-            density="compact"
-            variant="outlined"
-            clearable
-            multiple
-            chips
-            prepend-inner-icon="mdi-tag-outline"
-            class="flex-grow-1"
-          />
-          <v-autocomplete
-            v-model="form.client"
-            :items="store.clients.map((c) => ({ title: c.name, value: c.name }))"
-            label="Клиент"
-            density="compact"
-            variant="outlined"
-            clearable
-            prepend-inner-icon="systemIcons:iconClient"
-            class="flex-grow-1"
-          />
-        </div>
-        <div class="d-flex ga-4">
-          <v-sheet
-              class="rounded-circle"
-              width="40px"
-              height="40px"
-              border
-            :color="statusColor"
-          >
-          </v-sheet>
+      <v-text-field
+        v-model="form.orderInput"
+        label="Номер заявки (заказ)"
+        density="compact"
+        variant="outlined"
+        prepend-inner-icon="mdi-clipboard-text-outline"
+        append-inner-icon="systemIcons:iconPlus"
+        hint="Enter или «+» — добавить в список"
+        persistent-hint
+        class="mb-3"
+        @keydown.enter.prevent="addOrder"
+        @click:append-inner="addOrder"
+      />
+      <v-list
+        v-if="form.orders.length"
+        variant="outlined"
+        density="compact"
+        class="order-list mb-1"
+      >
+        <v-list-item density="compact" v-for="(o, i) in form.orders" :key="i" class="px-2">
+          <template v-if="editingOrder === i">
+            <div class="d-flex align-center ga-2">
+              <v-text-field
+                :ref="(el) => { if (el) orderEditInputs[i] = el; }"
+                v-model="editOrderName"
+                density="compact"
+                class="order-item"
+                variant="outlined"
+                hide-details
+                tabindex="-1"
+                @keydown.enter="saveOrderEdit(i)"
+                @keydown.esc.stop="cancelOrderEdit"
+              />
+              <v-btn
+                  icon="systemIcons:iconCheck"
+                  aria-label="Сохранить"
+                  variant="text"
+                  size="x-small"
+                  @click="saveOrderEdit(i)">
+              </v-btn>
+              <v-btn
+                  icon="systemIcons:iconClose"
+                  aria-label="Отмена"
+                  variant="text"
+                  size="x-small"
+                  @click="cancelOrderEdit">
+              </v-btn>
+            </div>
+          </template>
+          <template v-else>
+            <div class="d-flex align-center">
+              <span class="ml-4 flex-grow-1 text-truncate">{{ o }}</span>
+              <v-btn
+                  icon="systemIcons:iconEdit"
+                  aria-label="Редактировать"
+                  variant="text"
+                  size="x-small"
+                  tabindex="-1"
+                  @click="startOrderEdit(i)">
+              </v-btn>
+              <v-btn icon="systemIcons:iconTrash"
+                     aria-label="Удалить"
+                     variant="text"
+                     size="x-small"
+                     tabindex="-1"
+                     color="error" @click="removeOrder(i)">
+              </v-btn>
+            </div>
+          </template>
+        </v-list-item>
+      </v-list>
+      <div v-if="form.orders.length" class="d-flex justify-end mb-3">
+        <v-btn variant="tonal" color="error" tabindex="-1" size="small" @click="pendingClearOrders = true">
+          Удалить все
+        </v-btn>
+      </div>
+      <div class="d-flex ga-4 mb-3">
         <v-autocomplete
-          v-model="form.customStatus"
-          :items="store.statuses.map((s) => ({ title: s.name, value: s.name }))"
-          label="Статус"
+          v-model="form.tags"
+          :items="store.tags.map((t) => ({ title: t.name, value: t.name }))"
+          label="Теги"
           density="compact"
           variant="outlined"
           clearable
-          prepend-inner-icon="mdi-flag-outline"
-          class="mb-3"
+          multiple
+          chips
+          prepend-inner-icon="mdi-tag-outline"
+          class="flex-grow-1"
         />
-          <div>
-          <v-checkbox
-            v-model="form.ourCar"
-            label="Наша машина"
-            density="compact"
-            hide-details
-
-            color="primary"
-          />
-          </div>
-        </div>
-        <div class="d-flex ga-4 mb-3">
-          <v-text-field
-            v-model="form.start"
-            label="Начало"
-            width="50%"
-            placeholder="дд.мм.гггг мм:чч"
-            v-maska="'##.##.#### ##:##'"
-            :rules="[dateTimeRule]"
-            density="compact"
-            variant="outlined"
-            prepend-inner-icon="mdi-clock-start"
-            class="flex-grow-1"
-          />
-          <v-text-field
-            v-model="form.end"
-            label="Завершение"
-            width="50%"
-            placeholder="дд.мм.гггг мм:чч"
-            v-maska="'##.##.#### ##:##'"
-            :rules="[dateTimeRule]"
-            density="compact"
-            variant="outlined"
-            clearable
-            prepend-inner-icon="mdi-clock-end"
-            class="flex-grow-1"
-          />
-        </div>
-        <v-btn
-          v-if="hasMultiRanges"
-          variant="tonal"
-          size="small"
-          class="mb-3"
-          prepend-icon="systemIcons:iconClock"
-          @click="showRanges = true"
-        >
-          Редактировать временные диапазоны
-        </v-btn>
-        <v-textarea
-          v-model="form.comment"
-          label="Комментарий"
-          rows="3"
+        <v-combobox
+          v-model="form.client"
+          :items="store.clients.map((c) => c.name)"
+          label="Клиент"
           density="compact"
           variant="outlined"
-          prepend-inner-icon="mdi-comment-outline"
+          clearable
+          prepend-inner-icon="systemIcons:iconClient"
+          hint="Можно ввести нового клиента"
+          persistent-hint
+          class="flex-grow-1"
         />
+      </div>
+      <div class="d-flex ga-4">
+        <v-sheet
+            class="rounded-circle"
+            width="40px"
+            height="40px"
+            border
+          :color="statusColor"
+        >
+        </v-sheet>
+      <v-autocomplete
+        v-model="form.customStatus"
+        :items="store.statuses.map((s) => ({ title: s.name, value: s.name }))"
+        label="Статус"
+        density="compact"
+        variant="outlined"
+        clearable
+        prepend-inner-icon="mdi-flag-outline"
+        class="mb-3"
+      />
+        <div>
+        <v-checkbox
+          v-model="form.ourCar"
+          label="Наша машина"
+          density="compact"
+          hide-details
+
+          color="primary"
+        />
+        </div>
+      </div>
+      <div class="d-flex ga-4 mb-3">
+        <v-text-field
+          v-model="form.start"
+          label="Начало"
+          width="50%"
+          placeholder="дд.мм.гггг мм:чч"
+          v-maska="'##.##.#### ##:##'"
+          :rules="[dateTimeRule]"
+          density="compact"
+          variant="outlined"
+          prepend-inner-icon="mdi-clock-start"
+          class="flex-grow-1"
+        />
+        <v-text-field
+          v-model="form.end"
+          label="Завершение"
+          width="50%"
+          placeholder="дд.мм.гггг мм:чч"
+          v-maska="'##.##.#### ##:##'"
+          :rules="[dateTimeRule]"
+          density="compact"
+          variant="outlined"
+          clearable
+          prepend-inner-icon="mdi-clock-end"
+          class="flex-grow-1"
+        />
+      </div>
+      <v-btn
+        v-if="hasMultiRanges"
+        variant="tonal"
+        size="small"
+        class="mb-3"
+        prepend-icon="systemIcons:iconClock"
+        @click="showRanges = true"
+      >
+        Редактировать временные диапазоны
+      </v-btn>
+      <v-textarea
+        v-model="form.comment"
+        label="Комментарий"
+        rows="3"
+        density="compact"
+        variant="outlined"
+        prepend-inner-icon="mdi-comment-outline"
+      />
 
     <template #actions>
       <v-btn variant="text" @click="onClose">Отмена</v-btn>
@@ -245,4 +340,27 @@ function onRangesSave(lines) {
     @save="onRangesSave"
     @close="showRanges = false"
   />
+
+  <ConfirmDialog
+    v-if="pendingClearOrders"
+    title="Удалить все номера заявок?"
+    message="Все номера заявок будут удалены из задачи. Продолжить?"
+    @confirm="form.orders = []; pendingClearOrders = false"
+    @close="pendingClearOrders = false"
+  />
 </template>
+
+<style lang="scss" scoped>
+.order-list {
+  max-height: 180px;
+  overflow-y: auto;
+  .order-item {
+    :deep(.v-field__input) {
+      min-height: 16px;
+      padding-block: 4px;
+
+    }
+  }
+}
+
+</style>

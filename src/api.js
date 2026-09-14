@@ -52,6 +52,7 @@ export const api = {
       exportTags: opts.tags,
       exportClients: opts.clients,
       exportUsers: opts.users,
+      exportStatuses: opts.statuses,
     }),
 
   /** Импортировать данные из JSON-файла по указанному пути. */
@@ -62,6 +63,7 @@ export const api = {
       importTags: opts.tags,
       importClients: opts.clients,
       importUsers: opts.users,
+      importStatuses: opts.statuses,
     }),
 
   /** Создать задачу из черновика { user, order, tags, client, comment, customStatus }. Возвращает AppTask. */
@@ -98,11 +100,6 @@ export const api = {
   setSettings: (username, grouping, accentColor) => call("set_settings", { username, grouping, accentColor }),
   /** Сохранить цвет ячейки «Наша машина». */
   setOurCarColor: (color) => call("set_our_car_color", { color }),
-  /** Сохранить вид и размер шрифта таблицы задач. */
-  setTableFont: (family, size) => call("set_table_font", { family, size }),
-  /** Сохранить тему оформления ("light" | "dark"). */
-  setTheme: (theme) => call("set_theme", { theme }),
-
   /** Сохранить порядок и видимость колонок таблицы. */
   setColumns: (columns) => call("set_columns", { columns }),
 

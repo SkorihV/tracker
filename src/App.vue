@@ -35,7 +35,7 @@ async function newTask() {
   editing.value = {
     mode: "new",
     user: store.settings.username,
-    order: "",
+    orders: [],
     tags: [],
     client: "",
     comment: "",
@@ -49,7 +49,7 @@ function editTask(task) {
     mode: "edit",
     taskId: task.taskId,
     user: task.user,
-    order: task.order,
+    orders: task.orders || [],
     tags: task.tags || [],
     client: task.client,
     comment: task.comment,
@@ -65,9 +65,8 @@ function editTask(task) {
 async function onSaveTask(draft) {
   const fields = {
     user: draft.user,
-    order: draft.order,
-    tags: draft.tags || [],
-    client: draft.client,
+    orders: draft.orders || [],
+    tags: draft.tags || [],    client: draft.client,
     comment: draft.comment,
     customStatus: draft.customStatus || "",
     ourCar: draft.ourCar || false,

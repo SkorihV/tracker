@@ -96,11 +96,11 @@ fn create_report(
     let accent = st.settings.accent_color.clone();
     let saved = match path {
         Some(p) if !p.is_empty() => {
-            report::write_report_to(std::path::Path::new(&p), &format, &st.tasks, &filter, &date_from, &date_to, &accent)?
+            report::write_report_to(std::path::Path::new(&p), &format, &st.tasks, &filter, &date_from, &date_to, &accent, &st.settings.columns)?
         }
         _ => {
             let base = base_dir(&app);
-            report::write_report(&base, &format, &st.tasks, &filter, &date_from, &date_to, &accent)?
+            report::write_report(&base, &format, &st.tasks, &filter, &date_from, &date_to, &accent, &st.settings.columns)?
         }
     };
     Ok(saved.to_string_lossy().to_string())
@@ -144,9 +144,10 @@ fn export_json(
     export_tags: bool,
     export_clients: bool,
     export_users: bool,
+    export_statuses: bool,
 ) -> Result<(), String> {
     let st = s.0.lock().map_err(|e| e.to_string())?;
-    tracker_core::Store::export_json_file(&st, std::path::Path::new(&path), export_tasks, export_tags, export_clients, export_users)
+    tracker_core::Store::export_json_file(&st, std::path::Path::new(&path), export_tasks, export_tags, export_clients, export_users, export_statuses)
 }
 
 #[tauri::command]
@@ -157,21 +158,22 @@ fn import_json(
     import_tags: bool,
     import_clients: bool,
     import_users: bool,
+    import_statuses: bool,
 ) -> Result<(), String> {
     let mut st = s.0.lock().map_err(|e| e.to_string())?;
-    tracker_core::Store::import_json_file(&mut st, std::path::Path::new(&path), import_tasks, import_tags, import_clients, import_users)
+    tracker_core::Store::import_json_file(&mut st, std::path::Path::new(&path), import_tasks, import_tags, import_clients, import_users, import_statuses)
 }
 
 #[tauri::command]
-fn create_task(s: State<'_, AppStore>, user: String, order: String, tags: Vec<String>, client: String, comment: String, custom_status: String, our_car: bool) -> Result<tracker_core::models::AppTask, String> {
+fn create_task(s: State<'_, AppStore>, user: String, orders: Vec<String>, tags: Vec<String>, client: String, comment: String, custom_status: String, our_car: bool) -> Result<tracker_core::models::AppTask, String> {
     let mut st = s.0.lock().map_err(|e| e.to_string())?;
-    Ok(st.create_task(TaskDraft { user, order, tags, client, comment, custom_status, our_car }))
+    Ok(st.create_task(TaskDraft { user, orders, tags, client, comment, custom_status, our_car }))
 }
 
 #[tauri::command]
-fn update_task(s: State<'_, AppStore>, task_id: String, user: String, order: String, tags: Vec<String>, client: String, comment: String, custom_status: String, our_car: bool) -> Result<(), String> {
+fn update_task(s: State<'_, AppStore>, task_id: String, user: String, orders: Vec<String>, tags: Vec<String>, client: String, comment: String, custom_status: String, our_car: bool) -> Result<(), String> {
     let mut st = s.0.lock().map_err(|e| e.to_string())?;
-    st.update_task(&task_id, TaskDraft { user, order, tags, client, comment, custom_status, our_car });
+    st.update_task(&task_id, TaskDraft { user, orders, tags, client, comment, custom_status, our_car });
     Ok(())
 }
 
@@ -239,22 +241,6 @@ fn set_our_car_color(s: State<'_, AppStore>, color: String) -> Result<(), String
     s.0.lock()
         .map_err(|e| e.to_string())?
         .set_our_car_color(color);
-    Ok(())
-}
-
-#[tauri::command]
-fn set_theme(s: State<'_, AppStore>, theme: String) -> Result<(), String> {
-    s.0.lock()
-        .map_err(|e| e.to_string())?
-        .set_theme(theme);
-    Ok(())
-}
-
-#[tauri::command]
-fn set_table_font(s: State<'_, AppStore>, family: String, size: u32) -> Result<(), String> {
-    s.0.lock()
-        .map_err(|e| e.to_string())?
-        .set_table_font(family, size);
     Ok(())
 }
 
@@ -449,8 +435,6 @@ pub fn run() {
             remove_tasks,
             set_settings,
             set_our_car_color,
-            set_theme,
-            set_table_font,
             set_columns,
             set_backups_dir,
             default_backups_dir,

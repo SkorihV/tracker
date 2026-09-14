@@ -9,7 +9,94 @@ use serde::Serialize;
 
 use crate::dt::{fmt_td, now_naive, parse_date};
 use crate::logic::{TaskFilter, TotalLine};
-use crate::models::Task;
+use crate::models::{ColumnPref, Task, TaskStatus};
+
+// ---------------------------------------------------------------------
+// Колонки отчёта — как в таблице задач
+// ---------------------------------------------------------------------
+
+/// Колонки отчёта: ключ из настроек таблицы + заголовок.
+/// Служебные колонки таблицы (actions) в отчёт не попадают.
+const REPORT_COLUMNS: [(&str, &str); 12] = [
+    ("time", "Время"),
+    ("status", "Статус"),
+    ("ourCar", "Наша машина"),
+    ("mode", "Режим"),
+    ("order", "Заявка"),
+    ("client", "Клиент"),
+    ("tags", "Тег"),
+    ("start", "Начало"),
+    ("end", "Завершение"),
+    ("user", "Пользователь"),
+    ("comment", "Комментарий"),
+    ("taskId", "ID"),
+];
+
+/// Эффективный список колонок отчёта по настройкам таблицы: только видимые,
+/// в сохранённом порядке; колонки, не упомянутые в настройках, добавляются
+/// в конец. Скрытые колонки не выгружаются.
+fn report_column_keys(prefs: &[ColumnPref]) -> Vec<&'static str> {
+    let mut out: Vec<&'static str> = Vec::new();
+    for p in prefs {
+        if !p.visible || p.key == "actions" {
+            continue;
+        }
+        if let Some((k, _)) = REPORT_COLUMNS.iter().find(|(k, _)| *k == p.key) {
+            if !out.contains(k) {
+                out.push(k);
+            }
+        }
+    }
+    for (k, _) in REPORT_COLUMNS {
+        let mentioned = prefs.iter().any(|p| p.key == k);
+        if !mentioned && !out.contains(&k) {
+            out.push(k);
+        }
+    }
+    out
+}
+
+fn report_column_title(key: &str) -> &'static str {
+    REPORT_COLUMNS
+        .iter()
+        .find(|(k, _)| *k == key)
+        .map(|(_, t)| *t)
+        .unwrap_or("")
+}
+
+/// Человекочитаемая метка режима задачи (как в таблице).
+fn mode_label(s: &TaskStatus) -> &'static str {
+    match s {
+        TaskStatus::Running => "В работе",
+        TaskStatus::Paused => "На паузе",
+        TaskStatus::Completed => "Завершена",
+    }
+}
+
+/// Значение ячейки отчёта для колонки таблицы.
+fn report_cell(t: &Task, key: &str, now: chrono::NaiveDateTime) -> String {
+    match key {
+        "time" => fmt_td(t.total_seconds(now)),
+        "status" => t.custom_status.clone(),
+        "ourCar" => {
+            if t.our_car {
+                "Да".to_string()
+            } else {
+                String::new()
+            }
+        }
+        "mode" => mode_label(&t.status).to_string(),
+        "order" => t.orders.join(", "),
+        "client" => t.client.clone(),
+        "tags" => t.tags.join(", "),
+        "start" => t.start_str(),
+        "end" => t.end_str(),
+        "user" => t.user.clone(),
+        "comment" => t.comment.clone(),
+        "taskId" => t.task_id.clone(),
+        _ => String::new(),
+    }
+}
 
 /// Распарсить "#rrggbb" или "#rrggbbaa" в u32 (0xRRGGBBAA). Err — для RGB белый.
 fn accent_u32(s: &str) -> u32 {
@@ -38,6 +125,9 @@ pub struct ReportRow {
     pub elapsed_label: String,
     pub comment: String,
     pub ranges: String,
+    pub custom_status: String,
+    pub our_car: bool,
+    pub mode: String,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -117,7 +207,8 @@ pub fn filtered_tasks<'a>(tasks: &'a [Task], f: &TaskFilter) -> Vec<&'a Task> {
         }
         if !q.is_empty() {
             let tags_text = t.tags.join(" ");
-            let hay = [&t.task_id, &t.order, &tags_text, &t.client, &t.user, &t.comment];
+            let orders_text = t.orders.join(" ");
+            let hay = [&t.task_id, &orders_text, &tags_text, &t.client, &t.user, &t.comment];
             if !hay.iter().any(|s| s.to_lowercase().contains(&q)) {
                 continue;
             }
@@ -248,12 +339,15 @@ pub fn report_preview(tasks: &[Task], f: &TaskFilter) -> ReportPreview {
             start: t.start_str(),
             end: t.end_str(),
             user: t.user.clone(),
-            order: t.order.clone(),
+            order: t.orders.join(", "),
             client: t.client.clone(),
             tags: t.tags.clone(),
             elapsed_label: fmt_td(t.total_seconds(now)),
             comment: t.comment.clone(),
             ranges: t.ranges_str(),
+            custom_status: t.custom_status.clone(),
+            our_car: t.our_car,
+            mode: mode_label(&t.status).to_string(),
         })
         .collect();
 
@@ -337,6 +431,7 @@ pub fn write_report(
     date_from: &str,
     date_to: &str,
     accent_color: &str,
+    columns: &[ColumnPref],
 ) -> Result<PathBuf, String> {
     let now = now_naive();
     let list = filtered_tasks(tasks, filter);
@@ -349,7 +444,7 @@ pub fn write_report(
     let dir = reports_dir(base);
     let ts = ts_stamp();
     let path = dir.join(format!("report_{ts}.{format}"));
-    write_report_body(&path, format, &list, secs, &tag_map, date_from, date_to, accent_color)?;
+    write_report_body(&path, format, &list, secs, &tag_map, date_from, date_to, accent_color, columns)?;
     Ok(path)
 }
 
@@ -362,6 +457,7 @@ pub fn write_report_to(
     date_from: &str,
     date_to: &str,
     accent_color: &str,
+    columns: &[ColumnPref],
 ) -> Result<PathBuf, String> {
     let now = now_naive();
     let list = filtered_tasks(tasks, filter);
@@ -373,7 +469,7 @@ pub fn write_report_to(
     if let Some(parent) = path.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
-    write_report_body(path, format, &list, secs, &tag_map, date_from, date_to, accent_color)?;
+    write_report_body(path, format, &list, secs, &tag_map, date_from, date_to, accent_color, columns)?;
     Ok(path.to_path_buf())
 }
 
@@ -386,6 +482,7 @@ fn write_report_body(
     date_from: &str,
     date_to: &str,
     accent_color: &str,
+    columns: &[ColumnPref],
 ) -> Result<(), String> {
     match format {
         "txt" => {
@@ -397,25 +494,21 @@ fn write_report_body(
             std::fs::write(path, body).map_err(|e| e.to_string())?;
         }
         "csv" => {
+            let keys = report_column_keys(columns);
             let mut body = String::new();
-            body.push_str("\"Дата начала\",\"Дата окончания\",\"Пользователь\",\"Номер заявки\",\"Клиент\",\"Тег\",\"Время (чч:мм:сс)\",\"Комментарий\",\"Диапазоны\"\r\n");
+            body.push_str(&row_csv(
+                &keys.iter().map(|k| report_column_title(k).to_string()).collect::<Vec<_>>(),
+            ));
+            let now = now_naive();
             for t in list {
-                body.push_str(&row_csv(&[
-                    t.start_str(),
-                    t.end_str(),
-                    t.user.clone(),
-                    t.order.clone(),
-                    t.client.clone(),
-                    t.tags.join(", "),
-                    fmt_td(t.total_seconds(now_naive())),
-                    t.comment.clone(),
-                    t.ranges_str(),
-                ]));
+                body.push_str(&row_csv(
+                    &keys.iter().map(|k| report_cell(t, k, now)).collect::<Vec<_>>(),
+                ));
             }
             write_cp1251(path, &body)?;
         }
         "xlsx" => {
-            write_report_xlsx(path, list, secs, tag_map, date_from, date_to, accent_color)?;
+            write_report_xlsx(path, list, secs, tag_map, date_from, date_to, accent_color, columns)?;
         }
         _ => return Err(format!("Неизвестный формат: {format}")),
     }
@@ -556,7 +649,7 @@ fn report_txt(list: &[&Task], secs: f64, tag_map: &HashMap<String, f64>, date_fr
             t.client,
             t.tags.join(", "),
             fmt_td(t.total_seconds(now)),
-            t.order,
+            t.orders.join(", "),
             t.ranges_str(),
         ));
         if !t.comment.is_empty() {
@@ -599,7 +692,7 @@ fn report_md(list: &[&Task], secs: f64, tag_map: &HashMap<String, f64>, date_fro
             t.client,
             t.tags.join(", "),
             fmt_td(t.total_seconds(now_naive())),
-            t.order,
+            t.orders.join(", "),
             comment,
             t.ranges_str(),
         ));
@@ -638,6 +731,7 @@ fn write_report_xlsx(
     date_from: &str,
     date_to: &str,
     accent_color: &str,
+    columns: &[ColumnPref],
 ) -> Result<(), String> {
     use rust_xlsxwriter::Workbook;
 
@@ -665,33 +759,20 @@ fn write_report_xlsx(
     }
     row += 1;
 
-    let headers = [
-        "Дата начала", "Дата окончания", "Пользователь", "Номер заявки",
-        "Клиент", "Тег", "Время", "Комментарий", "Диапазоны",
-    ];
-    for (col, h) in headers.iter().enumerate() {
-        ws.write_string_with_format(row, col as u16, *h, &header).map_err(err)?;
+    let keys = report_column_keys(columns);
+    for (col, k) in keys.iter().enumerate() {
+        ws.write_string_with_format(row, col as u16, report_column_title(k), &header).map_err(err)?;
     }
     row += 1;
+    let now = now_naive();
     for t in list {
-        let vals = [
-            t.start_str(),
-            t.end_str(),
-            t.user.clone(),
-            t.order.clone(),
-            t.client.clone(),
-            t.tags.join(", "),
-            fmt_td(t.total_seconds(now_naive())),
-            t.comment.clone(),
-            t.ranges_str(),
-        ];
-        for (col, val) in vals.iter().enumerate() {
-            ws.write_string(row, col as u16, val).map_err(err)?;
+        for (col, k) in keys.iter().enumerate() {
+            ws.write_string(row, col as u16, &report_cell(t, k, now)).map_err(err)?;
         }
         row += 1;
     }
 
-    for col in 0..headers.len() {
+    for col in 0..keys.len() {
         ws.set_column_width(col as u16, 18.0).map_err(err)?;
     }
     wb.save(path).map_err(err)

@@ -191,7 +191,7 @@ impl Store {
         let mut task = Task {
             task_id: self.id_gen.next_id(),
             user: String::new(),
-            order: String::new(),
+            orders: Vec::new(),
             tags: Vec::new(),
             client: String::new(),
             status: crate::models::TaskStatus::Running,
@@ -208,6 +208,7 @@ impl Store {
         for tag in task.tags.clone() {
             self.ensure_tag(&tag);
         }
+        self.ensure_client(&task.client);
         self.ensure_status(&task.custom_status);
         let view = AppTask::from_task(&task, now_naive());
         self.tasks.push(task);
@@ -226,6 +227,7 @@ impl Store {
                 self.ensure_tag(&tag);
             }
         }
+        self.ensure_client(&draft.client);
         self.ensure_status(&draft.custom_status.trim());
         self.save();
     }
@@ -445,6 +447,20 @@ impl Store {
         self.save();
     }
 
+    /// Добавить клиента в справочник, если его там ещё нет.
+    fn ensure_client(&mut self, name: &str) {
+        let name = name.trim();
+        if name.is_empty() || self.clients.iter().any(|e| e.name == name) {
+            return;
+        }
+        self.clients.push(Entity {
+            id: self.next_client_id,
+            name: name.to_string(),
+        });
+        self.next_client_id += 1;
+        self.save();
+    }
+
     pub fn add_tag(&mut self, name: &str) {
         let name = name.trim();
         if name.is_empty() || self.tags.iter().any(|e| e.name == name) {
@@ -643,9 +659,9 @@ pub fn export_json_file(
     export_tags: bool,
     export_clients: bool,
     export_users: bool,
+    export_statuses: bool,
 ) -> Result<(), String> {
     let mut data = serde_json::Map::new();
-    data.insert("settings".into(), st.settings.to_json());
     if export_users {
         data.insert("users".into(), serde_json::to_value(&st.users).unwrap_or_default());
     }
@@ -659,6 +675,12 @@ pub fn export_json_file(
         data.insert(
             "clients".into(),
             serde_json::to_value(&st.clients).unwrap_or_default(),
+        );
+    }
+    if export_statuses {
+        data.insert(
+            "statuses".into(),
+            serde_json::to_value(&st.statuses).unwrap_or_default(),
         );
     }
     if export_tasks {
@@ -680,6 +702,7 @@ pub fn import_json_file(
     import_tags: bool,
     import_clients: bool,
     import_users: bool,
+    import_statuses: bool,
 ) -> Result<(), String> {
     let raw = match std::fs::read_to_string(path) {
         Ok(s) => s,
@@ -709,18 +732,18 @@ pub fn import_json_file(
                 .to_string(),
         );
     }
-    let known = ["tasks", "tags", "clients", "users", "settings"];
+    let known = ["tasks", "tags", "clients", "users", "statuses", "settings"];
     if !known.iter().any(|k| data.get(k).is_some()) {
         return Err(
             "В выбранном файле не найдено разделов данных\n\
-             (tasks, tags, clients, users, settings).\n\
+             (tasks, tags, clients, users, statuses).\n\
              Возможные причины:\n\
              \u{2022} выбран не тот файл;\n\
              \u{2022} это не экспорт Time Tracker."
                 .to_string(),
         );
     }
-    for key in ["tasks", "tags", "clients", "users"] {
+    for key in ["tasks", "tags", "clients", "users", "statuses"] {
         if let Some(v) = data.get(key) {
             if !v.is_array() {
                 return Err(format!(
@@ -762,13 +785,14 @@ pub fn import_json_file(
                 }
             }
         }
-        if let Some(username) = data
-            .get("settings")
-            .and_then(|s| s.get("username"))
-            .and_then(|x| x.as_str())
-        {
-            if !username.is_empty() && st.settings.username.trim().is_empty() {
-                st.settings.username = username.to_string();
+    }
+
+    if import_statuses {
+        if let Some(arr) = data.get("statuses").and_then(|x| x.as_array()) {
+            for sd in arr {
+                if let Some(s) = StatusDef::from_json(sd) {
+                    st.add_status(&s.name, &s.color);
+                }
             }
         }
     }
@@ -852,32 +876,11 @@ pub fn import_json_file(
         self.save();
     }
 
-    /// Сохранить тему оформления ("light" | "dark").
-    pub fn set_theme(&mut self, theme: String) {
-        let theme = theme.trim().to_string();
-        if theme == "light" || theme == "dark" {
-            self.settings.theme = theme;
-            self.save();
-        }
-    }
-
     /// Сохранить цвет ячейки «Наша машина».
     pub fn set_our_car_color(&mut self, color: String) {
         let color = color.trim().to_string();
         if let Some(hex) = normalize_hex(&color) {
             self.settings.our_car_color = hex;
-        }
-        self.save();
-    }
-
-    /// Сохранить вид и размер шрифта таблицы задач.
-    pub fn set_table_font(&mut self, family: String, size: u32) {
-        let family = family.trim().to_string();
-        if !family.is_empty() && family.chars().count() <= 80 {
-            self.settings.font_family = family;
-        }
-        if (8..=40).contains(&size) {
-            self.settings.font_size = size;
         }
         self.save();
     }

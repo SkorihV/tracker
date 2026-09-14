@@ -108,7 +108,8 @@ pub fn apply_filter(tasks: &[Task], f: &TaskFilter, now: NaiveDateTime) -> Vec<A
         }
         if !q.is_empty() {
             let tags_text = t.tags.join(" ");
-            let hay = [&t.task_id, &t.order, &tags_text, &t.client, &t.user, &t.comment];
+            let orders_text = t.orders.join(" ");
+            let hay = [&t.task_id, &orders_text, &tags_text, &t.client, &t.user, &t.comment];
             if !hay.iter().any(|s| s.to_lowercase().contains(&q)) {
                 continue;
             }

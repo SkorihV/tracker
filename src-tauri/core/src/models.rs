@@ -38,11 +38,8 @@ pub struct Settings {
     pub grouping: String, // "none" | "day" | "client"
     pub accent_color: String, // цвет кнопок/заголовков (hex "#rrggbb")
     pub our_car_color: String, // цвет ячейки «Наша машина» (hex "#rrggbb")
-    pub font_family: String, // вид шрифта таблицы задач (CSS font-family)
-    pub font_size: u32, // размер шрифта таблицы задач (px)
     pub columns: Vec<ColumnPref>, // порядок и видимость колонок таблицы
     pub backup_dir: String, // пользовательский каталог бэкапов ("") = по умолчанию
-    pub theme: String, // тема оформления: "light" | "dark"
 }
 
 impl Default for Settings {
@@ -52,11 +49,8 @@ impl Default for Settings {
             grouping: "none".into(),
             accent_color: "#4caf50".into(),
             our_car_color: "#2196f3".into(),
-            font_family: "Roboto".into(),
-            font_size: 14,
             columns: Vec::new(),
             backup_dir: String::new(),
-            theme: "light".into(),
         }
     }
 }
@@ -79,17 +73,6 @@ impl Settings {
             .and_then(|x| x.as_str())
             .unwrap_or("#2196f3")
             .to_string();
-        let font_family = obj
-            .and_then(|o| o.get("font_family"))
-            .and_then(|x| x.as_str())
-            .filter(|s| !s.trim().is_empty())
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| "Roboto".to_string());
-        let font_size = obj
-            .and_then(|o| o.get("font_size"))
-            .and_then(|x| x.as_u64())
-            .filter(|v| *v >= 8 && *v <= 40)
-            .unwrap_or(14) as u32;
         let columns = obj
             .and_then(|o| o.get("columns"))
             .and_then(|x| x.as_array())
@@ -100,11 +83,6 @@ impl Settings {
             .and_then(|x| x.as_str())
             .unwrap_or("")
             .to_string();
-        let theme = obj
-            .and_then(|o| o.get("theme"))
-            .and_then(|x| x.as_str())
-            .unwrap_or("light")
-            .to_string();
         Settings {
             username: obj
                 .and_then(|o| o.get("username"))
@@ -114,11 +92,8 @@ impl Settings {
             grouping,
             accent_color,
             our_car_color,
-            font_family,
-            font_size,
             columns,
             backup_dir,
-            theme,
         }
     }
 
@@ -128,11 +103,8 @@ impl Settings {
             "grouping": self.grouping,
             "accent_color": self.accent_color,
             "our_car_color": self.our_car_color,
-            "font_family": self.font_family,
-            "font_size": self.font_size,
             "columns": self.columns,
             "backup_dir": self.backup_dir,
-            "theme": self.theme,
         })
     }
 }
@@ -245,7 +217,7 @@ fn parse_seg(v: &J) -> Option<Interval> {
 pub struct Task {
     pub task_id: String,
     pub user: String,
-    pub order: String,
+    pub orders: Vec<String>,
     pub tags: Vec<String>,
     pub client: String,
     pub status: TaskStatus,
@@ -284,6 +256,28 @@ fn tags_from_json(obj: &serde_json::Map<String, J>) -> Vec<String> {
     }
 }
 
+fn orders_from_json(obj: &serde_json::Map<String, J>) -> Vec<String> {
+    if let Some(arr) = obj.get("orders").and_then(|x| x.as_array()) {
+        let mut v: Vec<String> = arr
+            .iter()
+            .filter_map(|x| x.as_str())
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        v.dedup();
+        if !v.is_empty() {
+            return v;
+        }
+    }
+    // Совместимость со старым форматом: одно поле «order» (строка).
+    let old = str_at(obj, "order");
+    if old.is_empty() {
+        Vec::new()
+    } else {
+        vec![old]
+    }
+}
+
 impl Task {
     pub fn from_json(v: &J, load_now: NaiveDateTime) -> Option<Task> {
         let obj = v.as_object()?;
@@ -309,7 +303,7 @@ impl Task {
         Some(Task {
             task_id: str_at(obj, "task_id"),
             user: str_at(obj, "user"),
-            order: str_at(obj, "order"),
+            orders: orders_from_json(obj),
             tags: tags_from_json(obj),
             client: str_at(obj, "client"),
             status: TaskStatus::from_str(&str_at(obj, "status")),
@@ -425,7 +419,8 @@ impl Task {
         serde_json::json!({
             "task_id": self.task_id,
             "user": self.user,
-            "order": self.order,
+            "orders": self.orders,
+            "order": self.orders.join(", "),
             "tags": self.tags,
             "tag": self.tags.first().cloned().unwrap_or_default(),
             "client": self.client,
@@ -450,6 +445,7 @@ impl Task {
 pub struct AppTask {
     pub task_id: String,
     pub user: String,
+    pub orders: Vec<String>,
     pub order: String,
     pub tags: Vec<String>,
     pub client: String,
@@ -483,7 +479,8 @@ impl AppTask {
         AppTask {
             task_id: t.task_id.clone(),
             user: t.user.clone(),
-            order: t.order.clone(),
+            orders: t.orders.clone(),
+            order: t.orders.join(", "),
             tags: t.tags.clone(),
             client: t.client.clone(),
             comment: t.comment.clone(),
@@ -524,7 +521,8 @@ pub struct AppState {
 #[serde(rename_all = "camelCase")]
 pub struct TaskDraft {
     pub user: String,
-    pub order: String,
+    #[serde(default)]
+    pub orders: Vec<String>,
     pub tags: Vec<String>,
     pub client: String,
     pub comment: String,
@@ -536,7 +534,14 @@ pub struct TaskDraft {
 impl TaskDraft {
     pub fn apply(&self, t: &mut Task) {
         t.user = self.user.trim().to_string();
-        t.order = self.order.trim().to_string();
+        let mut orders: Vec<String> = self
+            .orders
+            .iter()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        orders.dedup();
+        t.orders = orders;
         let mut tags: Vec<String> = self
             .tags
             .iter()

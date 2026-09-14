@@ -188,6 +188,9 @@ const tableStyle = computed(() => ({
     <template #item.mode="{item}">
       <task-mode :task="item"/>
     </template>
+    <template #item.order="{item}">
+      <div class="order-element">{{item.order}}</div>
+    </template>
 
     <template #no-data>
       <task-no-data/>
@@ -204,6 +207,14 @@ const tableStyle = computed(() => ({
 .task-table .v-table__wrapper > table {
   width: max-content;
   min-width: 100%;
+}
+
+.order-element {
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis; /* Добавляет многоточие в конце */
 }
 
 </style>
