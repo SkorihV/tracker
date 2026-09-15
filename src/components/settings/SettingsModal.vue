@@ -1,11 +1,11 @@
 <script setup>
 import { ref, computed } from "vue"
 import { useAppStore } from "../../store.js"
-import EntityTab from "./tabs/EntityTab.vue"
-import ColumnsTab from "./tabs/ColumnsTab.vue"
-import StatusesTab from "./tabs/StatusesTab.vue"
-import GeneralTab from "./tabs/GeneralTab.vue"
-import BaseModal from "../BaseModal.vue"
+import TabEntity from "./tabs/TabEntity.vue"
+import TabColumns from "./tabs/TabColumns.vue"
+import TabStatuses from "./tabs/TabStatuses.vue"
+import TabGeneral from "./tabs/TabGeneral.vue"
+import BaseModal from "../base/BaseModal.vue"
 
 const store = useAppStore()
 const emit = defineEmits(["close"])
@@ -35,7 +35,7 @@ async function onAction(kind, payload) {
         </v-tabs>
 
         <div v-if="tab === 'general'">
-          <GeneralTab />
+          <TabGeneral />
         </div>
         <div v-if="tab === 'users'">
           <v-autocomplete
@@ -47,19 +47,19 @@ async function onAction(kind, payload) {
               class="mb-4"
               style="max-width: 360px"
           />
-          <EntityTab kind="user" title="Пользователи" :items="store.users" @action="(p) => onAction('user', p)" />
+          <TabEntity kind="user" title="Пользователи" :items="store.users" @action="(p) => onAction('user', p)" />
         </div>
         <div v-if="tab === 'tags'">
-          <EntityTab kind="tag" title="Теги" :items="store.tags" @action="(p) => onAction('tag', p)" />
+          <TabEntity kind="tag" title="Теги" :items="store.tags" @action="(p) => onAction('tag', p)" />
         </div>
         <div v-if="tab === 'clients'">
-          <EntityTab kind="client" title="Клиенты" :items="store.clients" @action="(p) => onAction('client', p)" />
+          <TabEntity kind="client" title="Клиенты" :items="store.clients" @action="(p) => onAction('client', p)" />
         </div>
         <div v-if="tab === 'statuses'">
-          <StatusesTab :items="store.statuses" @action="(p) => onAction('status', p)" />
+          <TabStatuses :items="store.statuses" @action="(p) => onAction('status', p)" />
         </div>
         <div v-if="tab === 'tasks'">
-          <ColumnsTab />
+          <TabColumns />
         </div>
 
     <template #actions>

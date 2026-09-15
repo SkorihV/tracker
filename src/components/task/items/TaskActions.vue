@@ -1,6 +1,6 @@
 <script setup>
 import {defineProps} from 'vue'
-import {useAppStore} from "../../store.js"
+import {useAppStore} from "../../../store.js"
 const store = useAppStore()
 
 const props = defineProps({

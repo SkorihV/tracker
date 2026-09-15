@@ -5,10 +5,10 @@ import FilterBar from "./components/filter/FilterBar.vue"
 import TaskTable from "./components/task/TaskTable.vue"
 import TaskModal from "./components/taskModal/TaskModal.vue"
 import SettingsModal from "./components/settings/SettingsModal.vue"
-import ReportModal from "./components/ReportModal.vue"
-import StatsModal from "./components/StatsModal.vue"
-import ImportExportModal from "./components/ImportExportModal.vue"
-import ConfirmDeleteModal from "./components/ConfirmDeleteModal.vue"
+import ReportModal from "./components/report/ReportModal.vue"
+import StatsModal from "./components/stats/StatsModal.vue"
+import ImportExportModal from "./components/import/ImportExportModal.vue"
+import BaseConfirmDeleteModal from "./components/base/BaseConfirmDeleteModal.vue"
 import HeaderLayout from "./components/header/HeaderLayout.vue"
 
 const store = useAppStore()
@@ -147,7 +147,6 @@ onBeforeUnmount(() => {
       <v-alert v-if="store.error" max-height="100px" type="error" density="compact" class="mb-3" closable @click:close="store.error = ''">
         {{ store.error }}
       </v-alert>
-
       <FilterBar />
 
       <TaskTable
@@ -186,7 +185,7 @@ onBeforeUnmount(() => {
     <ReportModal v-if="showReport" @close="showReport = false" />
     <StatsModal v-if="showStats" @close="showStats = false" />
     <ImportExportModal v-if="showImportExport" @close="showImportExport = false" />
-    <ConfirmDeleteModal
+    <BaseConfirmDeleteModal
       v-if="confirmDelete"
       :ids="confirmDelete"
       @confirm="onConfirmDelete"

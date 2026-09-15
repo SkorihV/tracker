@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from "vue"
-import BaseModal from "./BaseModal.vue"
+import BaseModal from "../base/BaseModal.vue"
 
 const props = defineProps({
   text: { type: String, default: "" },
@@ -55,7 +55,7 @@ function save() {
     </div>
     <v-textarea
       v-model="localText"
-      rows="12"
+      rows="10"
       variant="outlined"
       density="compact"
       class="ranges-textarea flex-grow-1"
@@ -63,9 +63,11 @@ function save() {
       autofocus
       @keydown.esc="emit('close')"
     />
-    <v-alert v-if="error" type="error" density="compact" class="mt-3">
-      {{ error }}
-    </v-alert>
+    <v-sheet v-if="error" density="compact">
+      <v-alert  color="error" density="compact" class="mt-3">
+        {{ error }}
+      </v-alert>
+    </v-sheet>
 
     <template #actions>
       <v-btn variant="text" @click="emit('close')">Отмена</v-btn>

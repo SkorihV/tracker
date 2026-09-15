@@ -1,6 +1,6 @@
 <script setup>
 import { defineModel } from 'vue'
-import { dateRule } from "../dateRules.js"
+import { dateRule } from "../../dateRules.js"
 
 const dateFrom = defineModel('dateFrom', { type: String, default: '' })
 const dateTo = defineModel('dateTo', { type: String, default: '' })
@@ -12,7 +12,7 @@ defineProps({
 
 const formats = ["xlsx","txt", "md", "csv"]
 
-defineOptions({name:'ReportPeriodFields'})
+defineOptions({name:'BasePeriodFields'})
 </script>
 
 <template>

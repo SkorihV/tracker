@@ -1,6 +1,6 @@
 <script setup>
 import { ref, nextTick } from "vue"
-import ConfirmDialog from "../../ConfirmDialog.vue"
+import BaseConfirmDialog from "../../base/BaseConfirmDialog.vue"
 
 const props = defineProps({
   kind: { type: String, required: true },
@@ -148,14 +148,14 @@ function move(index, step) {
       </v-btn>
     </div>
 
-    <ConfirmDialog
+    <BaseConfirmDialog
       v-if="pendingDelete"
       :title="`Удалить «${pendingDelete.name}»?`"
       :message="`«${pendingDelete.name}» будет удален безвозвратно из ${props.title.toLowerCase()}. Продолжить?`"
       @confirm="confirmRemove"
       @close="pendingDelete = null"
     />
-    <ConfirmDialog
+    <BaseConfirmDialog
       v-if="pendingClear"
       title="Удалить все элементы?"
       :message="`Все элементы будут удалены безвозвратно из ${props.title.toLowerCase()}. Продолжить?`"

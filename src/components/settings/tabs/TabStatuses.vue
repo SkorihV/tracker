@@ -1,7 +1,7 @@
 <script setup>
 import { ref, reactive, nextTick } from "vue"
 import { statusHex } from "../../../statusColors.js"
-import ConfirmDialog from "../../ConfirmDialog.vue"
+import BaseConfirmDialog from "../../base/BaseConfirmDialog.vue"
 
 const emit = defineEmits(["action"])
 const props = defineProps({
@@ -218,14 +218,14 @@ function move(index, step) {
       </v-btn>
     </div>
 
-    <ConfirmDialog
+    <BaseConfirmDialog
       v-if="pendingDelete"
       :title="`Удалить статус «${pendingDelete.name}»?`"
       :message="`Статус «${pendingDelete.name}» будет удален безвозвратно. Продолжить?`"
       @confirm="confirmRemove"
       @close="pendingDelete = null"
     />
-    <ConfirmDialog
+    <BaseConfirmDialog
       v-if="pendingClear"
       title="Удалить все статусы?"
       message="Все статусы будут удалены безвозвратно (у задач статус сбросится). Продолжить?"

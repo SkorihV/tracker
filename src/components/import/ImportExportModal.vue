@@ -1,9 +1,9 @@
 <script setup>
 import { ref, reactive } from "vue"
 import { save, open } from "@tauri-apps/plugin-dialog"
-import { api } from "../api"
-import { useAppStore } from "../store"
-import BaseModal from "./BaseModal.vue"
+import { api } from "../../api.js"
+import { useAppStore } from "../../store.js"
+import BaseModal from "../base/BaseModal.vue"
 
 const store = useAppStore()
 const emit = defineEmits(["close"])

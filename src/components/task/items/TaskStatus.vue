@@ -1,7 +1,7 @@
 <script setup>
 import {computed, defineProps} from 'vue'
-import {useAppStore} from "../../store.js"
-import {statusHex, statusTextHex} from "../../statusColors.js"
+import {useAppStore} from "../../../store.js"
+import {statusHex, statusTextHex} from "../../../statusColors.js"
 const store = useAppStore()
 const props = defineProps({
   task: Object

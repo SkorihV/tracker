@@ -1,11 +1,11 @@
 <script setup>
 import { ref, computed, watch } from "vue"
 import { save } from "@tauri-apps/plugin-dialog"
-import { api } from "../api"
-import { useAppStore } from "../store"
-import {reportFilter, today} from "../reportFilter"
-import BaseModal from "./BaseModal.vue"
-import ReportPeriodFields from "./ReportPeriodFields.vue"
+import { api } from "../../api.js"
+import { useAppStore } from "../../store.js"
+import {reportFilter, today} from "../../reportFilter.js"
+import BaseModal from "../base/BaseModal.vue"
+import BasePeriodFields from "../base/BasePeriodFields.vue"
 
 const store = useAppStore()
 const emit = defineEmits(["close"])
@@ -83,7 +83,7 @@ loadPreview()
 
 <template>
   <BaseModal title="Отчёт" max-width="1000" width="1000" max-height="85vh" @close="emit('close')">
-    <ReportPeriodFields v-model:date-from="dateFrom" v-model:date-to="dateTo" v-model:format="format" empty-hint="пусто = без ограничения" />
+    <BasePeriodFields v-model:date-from="dateFrom" v-model:date-to="dateTo" v-model:format="format" empty-hint="пусто = без ограничения" />
 
     <v-alert v-if="error" type="error" density="compact" variant="tonal" class="mb-3">
       {{ error }}

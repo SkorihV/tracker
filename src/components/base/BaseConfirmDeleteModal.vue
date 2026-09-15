@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from "vue"
-import ConfirmDialog from "./ConfirmDialog.vue"
+import BaseConfirmDialog from "./BaseConfirmDialog.vue"
 
 const props = defineProps({
   ids: { type: Array, default: () => [] },
@@ -19,10 +19,15 @@ const message = computed(() =>
     ? "Задача будет удалена безвозвратно. Продолжить?"
     : `Будет удалено безвозвратно задач: ${count.value}. Продолжить?`
 )
+
+defineOptions({
+  name: 'BaseConfirmDeleteModal'
+})
+
 </script>
 
 <template>
-  <ConfirmDialog
+  <BaseConfirmDialog
     :title="title"
     :message="message"
     @confirm="emit('confirm')"

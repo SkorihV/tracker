@@ -1,17 +1,17 @@
 <script setup>
 import { computed, defineModel } from "vue"
 import { useAppStore } from "../../store.js"
-import TaskActions from "./TaskActions.vue"
-import TaskComment from "./TaskComment.vue"
-import TaskTime from "./TaskTime.vue"
-import TaskStart from "./TaskStart.vue"
-import TaskEnd from "./TaskEnd.vue"
-import TaskTags from "./TaskTags.vue"
-import TaskStatus from "./TaskStatus.vue"
-import TaskOurCar from "./TaskOurCar.vue"
-import TaskGroupHeader from "./TaskGroupHeader.vue"
-import TaskNoData from "./TaskNoData.vue"
-import TaskMode from "./TaskMode.vue"
+import TaskActions from "./items/TaskActions.vue"
+import TaskComment from "./items/TaskComment.vue"
+import TaskTime from "./items/TaskTime.vue"
+import TaskStart from "./items/TaskStart.vue"
+import TaskEnd from "./items/TaskEnd.vue"
+import TaskTags from "./items/TaskTags.vue"
+import TaskStatus from "./items/TaskStatus.vue"
+import TaskOurCar from "./items/TaskOurCar.vue"
+import TaskGroupHeader from "./items/TaskGroupHeader.vue"
+import TaskNoData from "./items/TaskNoData.vue"
+import TaskMode from "./items/TaskMode.vue"
 
 const store = useAppStore()
 

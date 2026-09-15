@@ -19,6 +19,11 @@ function onKeydown(e) {
 
 onMounted(() => window.addEventListener("keydown", onKeydown))
 onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown))
+
+defineOptions({
+  name: 'BaseConfirmDialog'
+})
+
 </script>
 
 <template>
