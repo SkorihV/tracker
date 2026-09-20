@@ -2,10 +2,16 @@ import "@mdi/font/css/materialdesignicons.css"
 import "vuetify/styles"
 
 import { createVuetify } from "vuetify"
+import { ru } from "vuetify/locale"
 import { mdi } from "vuetify/iconsets/mdi"
 import { systemIcons } from "../icons/systemIcons"
 
 export default createVuetify({
+  locale: {
+    locale: "ru",
+    fallback: "ru",
+    messages: { ru },
+  },
   icons: {
     defaultSet: "mdi",
     sets: {

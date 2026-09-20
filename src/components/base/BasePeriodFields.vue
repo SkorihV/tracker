@@ -1,6 +1,6 @@
 <script setup>
 import { defineModel } from 'vue'
-import { dateRule } from "../../dateRules.js"
+import BaseDateField from "./BaseDateField.vue"
 
 const dateFrom = defineModel('dateFrom', { type: String, default: '' })
 const dateTo = defineModel('dateTo', { type: String, default: '' })
@@ -17,26 +17,18 @@ defineOptions({name:'BasePeriodFields'})
 
 <template>
   <div class="d-flex ga-4 mb-3 flex-wrap">
-    <v-text-field
+    <base-date-field
       v-model="dateFrom"
-      label="Дата с (дд.мм.гггг)"
+      label="Дата с"
       :placeholder="emptyHint"
-      v-maska="'##.##.####'"
-      :rules="[dateRule]"
-      density="compact"
-      variant="outlined"
-      hide-details
+      clearable
       style="max-width: 220px"
     />
-    <v-text-field
+    <base-date-field
       v-model="dateTo"
-      label="Дата по (дд.мм.гггг)"
+      label="Дата по"
       :placeholder="emptyHint"
-      v-maska="'##.##.####'"
-      :rules="[dateRule]"
-      density="compact"
-      variant="outlined"
-      hide-details
+      clearable
       style="max-width: 220px"
     />
     <v-autocomplete

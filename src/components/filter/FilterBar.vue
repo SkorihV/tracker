@@ -1,7 +1,7 @@
 <script setup>
 import { useAppStore } from "../../store.js"
-import { dateRule } from "../../dateRules.js"
 import { today } from "../../reportFilter.js"
+import BaseDateField from "../base/BaseDateField.vue"
 
 const store = useAppStore()
 
@@ -13,29 +13,21 @@ function resetFilters() {
 
 <template>
   <div class="d-flex align-center ga-2 flex-wrap pb-3">
-    <span class="text-body-2 text-medium-emphasis">С</span>
-    <v-text-field
+    <base-date-field
       v-model="store.filter.dateFrom"
-      placeholder="дд.мм.гггг"
-      v-maska="'##.##.####'"
-      :rules="[dateRule]"
-      density="compact"
-      variant="outlined"
-      hide-details
-      style="max-width: 140px"
-      @keydown.enter="store.refreshQuery()"
+      label="С"
+      clearable
+      clear-to-today
+      style="max-width: 180px"
+      @update:model-value="store.refreshQuery()"
     />
-    <span class="text-body-2 text-medium-emphasis">По</span>
-    <v-text-field
+    <base-date-field
       v-model="store.filter.dateTo"
-      placeholder="дд.мм.гггг"
-      v-maska="'##.##.####'"
-      :rules="[dateRule]"
-      density="compact"
-      variant="outlined"
-      hide-details
-      style="max-width: 140px"
-      @keydown.enter="store.refreshQuery()"
+      label="По"
+      clearable
+      clear-to-today
+      style="max-width: 180px"
+      @update:model-value="store.refreshQuery()"
     />
 
     <v-autocomplete
@@ -46,6 +38,7 @@ function resetFilters() {
       variant="outlined"
       hide-details
       clearable
+      prepend-inner-icon="systemIcons:iconUser"
       style="max-width: 200px"
       @update:model-value="store.refreshQuery()"
     />
@@ -60,6 +53,7 @@ function resetFilters() {
       clearable
       multiple
       chips
+      prepend-inner-icon="mdi-tag-outline"
       style="max-width: 240px"
       @update:model-value="store.refreshQuery()"
     />
@@ -72,6 +66,7 @@ function resetFilters() {
       variant="outlined"
       hide-details
       clearable
+      prepend-inner-icon="systemIcons:iconClient"
       style="max-width: 200px"
       @update:model-value="store.refreshQuery()"
     />
