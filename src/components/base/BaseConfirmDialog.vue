@@ -13,8 +13,14 @@ const emit = defineEmits(["confirm", "close"])
 
 function onKeydown(e) {
   const tag = (e.target.tagName || "").toLowerCase()
-  if (["input", "textarea", "select", "button"].includes(tag)) return
-  if (e.key === "Enter" && !e.repeat) emit("confirm")
+  if (["input", "textarea", "select"].includes(tag)) return
+  if (e.key === "Enter" && !e.repeat) {
+    e.preventDefault()
+    emit("confirm")
+  } else if (e.key === "Escape" && !e.repeat) {
+    e.preventDefault()
+    emit("close")
+  }
 }
 
 onMounted(() => window.addEventListener("keydown", onKeydown))
