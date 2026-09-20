@@ -1,10 +1,12 @@
 <script setup>
 import { ref, nextTick } from "vue"
 import BaseConfirmDialog from "../base/BaseConfirmDialog.vue"
+import { useAppStore } from "../../store.js"
+
+const store = useAppStore()
 
 const orders = defineModel("orders", { type: Array, default: () => [] })
-
-const orderInput = ref("")
+const orderInput = defineModel("orderInput", { type: String, default: "" })
 const editingIndex = ref(null)
 const editName = ref("")
 const editInputs = {}
@@ -33,6 +35,11 @@ function cancelEdit() {
   editingIndex.value = null
 }
 
+function editDirty(i) {
+  const v = editName.value.trim()
+  return !!v && v !== orders.value[i]
+}
+
 function saveEdit(i) {
   const val = editName.value.trim()
   const dup = orders.value.some((x, j) => j !== i && x === val)
@@ -52,7 +59,7 @@ function saveEdit(i) {
       variant="outlined"
       prepend-inner-icon="mdi-clipboard-text-outline"
       append-inner-icon="systemIcons:iconPlus"
-      hint="Enter или «+» — добавить в список"
+      hint="Enter, «+» или «Сохранить» — добавить в список"
       persistent-hint
       class="mb-3"
       @keydown.enter.prevent="add"
@@ -77,12 +84,16 @@ function saveEdit(i) {
               tabindex="-1"
               @keydown.enter="saveEdit(i)"
               @keydown.esc.stop="cancelEdit"
+              @blur="cancelEdit"
             />
             <v-btn
                 icon="systemIcons:iconCheck"
                 aria-label="Сохранить"
-                variant="text"
+                :variant="editDirty(i) ? 'flat' : 'text'"
                 size="x-small"
+                :disabled="!editDirty(i)"
+                :color="editDirty(i) ? store.settings.accentColor : undefined"
+                @mousedown.prevent
                 @click="saveEdit(i)">
             </v-btn>
             <v-btn
@@ -90,6 +101,7 @@ function saveEdit(i) {
                 aria-label="Отмена"
                 variant="text"
                 size="x-small"
+                @mousedown.prevent
                 @click="cancelEdit">
             </v-btn>
           </div>

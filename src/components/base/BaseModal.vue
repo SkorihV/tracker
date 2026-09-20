@@ -2,6 +2,7 @@
 
 const props = defineProps({
   title: { type: String, default: "" },
+  persistent: { type: Boolean, default: false },
   maxWidth: { type: [Number, String], default: 600 },
   maxHeight: { type: [Number, String], default: "85vh" },
   width: { type: [Number, String], default: undefined },
@@ -17,6 +18,7 @@ defineOptions({name:'BaseModal'})
 <template>
   <v-dialog
     model-value
+    :persistent="persistent"
     :max-width="maxWidth"
     :max-height="maxHeight"
     :width="width"

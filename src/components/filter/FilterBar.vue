@@ -1,17 +1,12 @@
 <script setup>
 import { useAppStore } from "../../store.js"
 import { dateRule } from "../../dateRules.js"
+import { today } from "../../reportFilter.js"
 
 const store = useAppStore()
 
 function resetFilters() {
-  store.filter = { dateFrom: "", dateTo: "", tags: [], client: "", user: "", search: "" }
-  store.refreshQuery()
-}
-
-function clearDates() {
-  store.filter.dateFrom = ""
-  store.filter.dateTo = ""
+  store.filter = { dateFrom: today(), dateTo: today(), tags: [], client: "", user: "", search: "" }
   store.refreshQuery()
 }
 </script>
@@ -82,6 +77,5 @@ function clearDates() {
     />
 
     <v-btn variant="outlined" @click="resetFilters">Сбросить</v-btn>
-    <v-btn variant="text" @click="clearDates">Очистить даты</v-btn>
   </div>
 </template>

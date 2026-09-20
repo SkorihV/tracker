@@ -267,6 +267,49 @@ fn default_backups_dir(app: AppHandle) -> Result<String, String> {
         .to_string())
 }
 
+/// Папка, в которой хранится файл БД (base/data).
+#[tauri::command]
+fn db_dir(app: AppHandle) -> Result<String, String> {
+    let file = tracker_core::store::data_file(base_dir(&app));
+    let dir = file
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| file.clone());
+    Ok(dir.to_string_lossy().to_string())
+}
+
+/// Открыть папку в проводнике (создаёт её, если она ещё не существует).
+#[tauri::command]
+fn open_in_explorer(app: AppHandle, path: String) -> Result<(), String> {
+    let dir = PathBuf::from(path);
+    if !dir.exists() {
+        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .arg(&dir)
+            .spawn()
+            .map_err(|e| format!("Не удалось открыть проводник: {e}"))?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(&dir)
+            .spawn()
+            .map_err(|e| format!("Не удалось открыть папку: {e}"))?;
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(&dir)
+            .spawn()
+            .map_err(|e| format!("Не удалось открыть папку: {e}"))?;
+    }
+    let _ = app; // AppHandle не используется в этой команде
+    Ok(())
+}
+
 #[tauri::command]
 fn add_user(s: State<'_, AppStore>, name: String) -> Result<(), String> {
     s.0.lock().map_err(|e| e.to_string())?.add_user(&name);
@@ -438,6 +481,8 @@ pub fn run() {
             set_columns,
             set_backups_dir,
             default_backups_dir,
+            db_dir,
+            open_in_explorer,
             add_user,
             remove_user,
             clear_users,

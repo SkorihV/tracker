@@ -29,6 +29,7 @@ const form = reactive({
   taskId: props.draft.taskId || "",
   user: props.draft.user || store.settings.username || "",
   orders: [...(props.draft.orders || [])],
+  orderInput: "",
   tags: props.draft.tags || [],
   customStatus: props.draft.customStatus || "",
   ourCar: props.draft.ourCar || false,
@@ -57,6 +58,9 @@ const title = computed(() =>
 )
 
 function submit() {
+  const pendingOrder = form.orderInput.trim()
+  if (pendingOrder && !form.orders.includes(pendingOrder)) form.orders.push(pendingOrder)
+  form.orderInput = ""
   let datesDirty = false
   if (form.start !== baseStart.value) {
     if (isDateTimeValid(form.start || "")) datesDirty = true
@@ -75,7 +79,7 @@ function submit() {
 }
 
 function onClose() {
-  submit()
+  emit("close")
 }
 
 function onRangesSave(lines) {
@@ -99,7 +103,7 @@ function onRangesSave(lines) {
 </script>
 
 <template>
-  <BaseModal :title="title" @close="onClose">
+  <BaseModal persistent :title="title" @close="onClose">
     <v-autocomplete
       v-model="form.user"
       :items="store.users.map((u) => ({ title: u, value: u }))"
@@ -109,7 +113,7 @@ function onRangesSave(lines) {
       prepend-inner-icon="systemIcons:iconUser"
       class="mb-3"
     />
-    <order-numbers-editor v-model:orders="form.orders" />
+    <order-numbers-editor v-model:orders="form.orders" v-model:order-input="form.orderInput" />
     <div class="d-flex ga-4 mb-3">
       <v-autocomplete
         v-model="form.tags"

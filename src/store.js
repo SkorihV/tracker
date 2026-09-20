@@ -79,8 +79,8 @@ function defaultColumns() {
     { key: "order", label: "Заявка", visible: true, width: '500px' },
     { key: "client", label: "Клиент", visible: true, width: '' },
     { key: "tags", label: "Тег", visible: true, width: '' },
-    { key: "start", label: "Начало", visible: true, width: '180px' },
-    { key: "end", label: "Завершение", visible: true, width: '180px' },
+    { key: "start", label: "Начало", visible: true, width: '200px' },
+    { key: "end", label: "Завершение", visible: true, width: '200px' },
     { key: "user", label: "Пользователь", visible: true, width: '' },
     { key: "comment", label: "Комментарий", visible: true, width: '' },
     { key: "taskId", label: "ID", visible: false, width: '' },
@@ -396,6 +396,16 @@ export const useAppStore = defineStore("app", {
     async effectiveBackupsDir() {
       if (this.settings.backupDir) return this.settings.backupDir
       return this.getDefaultBackupsDir()
+    },
+
+    /** Папка, где хранится файл БД. */
+    async getDbDir() {
+      return (await api.getDbDir()) || ""
+    },
+
+    /** Открыть папку в проводнике. */
+    async openInExplorer(dir) {
+      return await api.openInExplorer(dir)
     },
   },
 })

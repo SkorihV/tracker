@@ -1,6 +1,9 @@
 <script setup>
 import { ref, nextTick } from "vue"
 import BaseConfirmDialog from "../../base/BaseConfirmDialog.vue"
+import { useAppStore } from "../../../store.js"
+
+const store = useAppStore()
 
 const props = defineProps({
   kind: { type: String, required: true },
@@ -38,6 +41,11 @@ function startEdit(key, name) {
 
 function cancelEdit() {
   editingKey.value = null
+}
+
+function editDirty(item) {
+  const v = editName.value.trim()
+  return !!v && v !== nameOf(item)
 }
 
 function saveEdit(key, oldName) {
@@ -104,11 +112,12 @@ function move(index, step) {
               hide-details
               @keydown.enter="saveEdit(keyOf(item), nameOf(item))"
               @keydown.esc.stop="cancelEdit"
+              @blur="cancelEdit"
             />
-            <v-btn icon aria-label="Сохранить" variant="text" size="small" @click="saveEdit(keyOf(item), nameOf(item))">
+            <v-btn icon aria-label="Сохранить" :variant="editDirty(item) ? 'flat' : 'text'" size="small" :disabled="!editDirty(item)" :color="editDirty(item) ? store.settings.accentColor : undefined" @mousedown.prevent @click="saveEdit(keyOf(item), nameOf(item))">
               <v-icon icon="systemIcons:iconCheck" />
             </v-btn>
-            <v-btn icon aria-label="Отмена" variant="text" size="small" @click="cancelEdit">
+            <v-btn icon aria-label="Отмена" variant="text" size="small" @mousedown.prevent @click="cancelEdit">
               <v-icon icon="systemIcons:iconClose" />
             </v-btn>
           </div>

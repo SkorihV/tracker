@@ -83,11 +83,13 @@ function resetFontDefault() {
 
 const defaultBackupsPath = ref("")
 const backupsPath = ref("")
+const dbPath = ref("")
 
 onMounted(async () => {
   defaultBackupsPath.value = await store.getDefaultBackupsDir()
   const effective = await store.effectiveBackupsDir()
   backupsPath.value = effective
+  dbPath.value = await store.getDbDir()
 })
 
 async function pickBackupsDir() {
@@ -253,6 +255,14 @@ async function resetBackupsDir() {
         >
           {{ backupsPath || "…" }}
         </span>
+        <v-btn
+          variant="tonal"
+          prepend-icon="systemIcons:iconFolder"
+          :disabled="!backupsPath"
+          @click="store.openInExplorer(backupsPath)"
+        >
+          Открыть в проводнике
+        </v-btn>
         <v-btn variant="tonal" prepend-icon="systemIcons:iconFolder" @click="pickBackupsDir">
           Выбрать
         </v-btn>
@@ -262,6 +272,26 @@ async function resetBackupsDir() {
           @click="resetBackupsDir"
         >
           По умолчанию
+        </v-btn>
+      </div>
+    </div>
+
+    <div class="d-flex flex-column ga-3">
+      <span class="text-body-2">Папка с базой данных:</span>
+      <div class="d-flex align-center ga-3 flex-wrap">
+        <span
+          class="mono text-caption text-medium-emphasis flex-grow-1"
+          style="min-width: 160px; max-width: 420px; overflow-wrap: anywhere"
+        >
+          {{ dbPath || "…" }}
+        </span>
+        <v-btn
+          variant="tonal"
+          prepend-icon="systemIcons:iconFolder"
+          :disabled="!dbPath"
+          @click="store.openInExplorer(dbPath)"
+        >
+          Открыть в проводнике
         </v-btn>
       </div>
     </div>

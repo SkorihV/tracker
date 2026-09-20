@@ -2,6 +2,9 @@
 import { ref, reactive, nextTick } from "vue"
 import { statusHex } from "../../../statusColors.js"
 import BaseConfirmDialog from "../../base/BaseConfirmDialog.vue"
+import { useAppStore } from "../../../store.js"
+
+const store = useAppStore()
 
 const emit = defineEmits(["action"])
 const props = defineProps({
@@ -57,6 +60,11 @@ function startEdit(item) {
 
 function cancelEdit() {
   editingKey.value = null
+}
+
+function editDirty(item) {
+  const v = editName.value.trim()
+  return !!v && v !== item.name
 }
 
 function saveEdit(item) {
@@ -150,13 +158,14 @@ function move(index, step) {
                 class="flex-grow-1"
                 @keydown.enter="saveEdit(item)"
                 @keydown.esc.stop="cancelEdit"
+                @blur="cancelEdit"
               />
             <span v-else class="flex-grow-1 text-truncate px-2">{{ nameOf(item) }}</span>
             <template v-if="editingKey === item.id">
-              <v-btn icon aria-label="Сохранить" variant="text" size="small" @click="saveEdit(item)">
+              <v-btn icon aria-label="Сохранить" :variant="editDirty(item) ? 'flat' : 'text'" size="small" :disabled="!editDirty(item)" :color="editDirty(item) ? store.settings.accentColor : undefined" @mousedown.prevent @click="saveEdit(item)">
                 <v-icon icon="systemIcons:iconCheck" />
               </v-btn>
-              <v-btn icon aria-label="Отмена" variant="text" size="small" @click="cancelEdit">
+              <v-btn icon aria-label="Отмена" variant="text" size="small" @mousedown.prevent @click="cancelEdit">
                 <v-icon icon="systemIcons:iconClose" />
               </v-btn>
             </template>

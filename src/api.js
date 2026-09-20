@@ -108,6 +108,8 @@ export const api = {
 
   /** Получить путь бэкапов по умолчанию. */
   getDefaultBackupsDir: () => call("default_backups_dir"),
+  getDbDir: () => call("db_dir"),
+  openInExplorer: (dir) => call("open_in_explorer", { path: dir }),
 
   /** Добавить пользователя в справочник. */
   addUser: (name) => call("add_user", { name }),
