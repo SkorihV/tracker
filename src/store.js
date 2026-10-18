@@ -48,6 +48,31 @@ function saveTheme(name) {
   writeCookie("tt_theme", name === "dark" ? "dark" : "light")
 }
 
+const MIN_COLUMN_WIDTH = 50
+const MAX_COLUMN_WIDTH = 5000
+
+/** Ширины колонок таблицы из cookie: { [key]: px } */
+export function readColumnWidths() {
+  try {
+    const v = readCookie("tt_colwidth")
+    if (!v) return {}
+    const obj = JSON.parse(v)
+    if (!obj || typeof obj !== "object" || Array.isArray(obj)) return {}
+    const out = {}
+    for (const [k, w] of Object.entries(obj)) {
+      const n = Math.round(Number(w))
+      if (Number.isFinite(n) && n >= MIN_COLUMN_WIDTH && n <= MAX_COLUMN_WIDTH) out[k] = n
+    }
+    return out
+  } catch {
+    return {}
+  }
+}
+
+export function saveColumnWidths(widths) {
+  writeCookie("tt_colwidth", JSON.stringify(widths || {}))
+}
+
 function applyAccentToTheme(color) {
   const c = HEX_RE.test(color || "") ? color : DEFAULT_ACCENT_COLOR
   try {
@@ -82,7 +107,7 @@ function defaultColumns() {
     { key: "start", label: "Начало", visible: true, width: '200px' },
     { key: "end", label: "Завершение", visible: true, width: '200px' },
     { key: "user", label: "Пользователь", visible: true, width: '' },
-    { key: "comment", label: "Комментарий", visible: true, width: '' },
+    { key: "comment", label: "Комментарий", visible: true, width: '', maxWidth: 500 },
     { key: "taskId", label: "ID", visible: false, width: '' },
   ]
 }

@@ -12,10 +12,16 @@ const editName = ref("")
 const editInputs = {}
 const pendingClear = ref(false)
 
+function splitOrders(s) {
+  return s.split(/[,\s]+/).map((x) => x.trim()).filter(Boolean)
+}
+
 function add() {
-  const val = orderInput.value.trim()
-  if (!val || orders.value.includes(val)) return
-  orders.value.push(val)
+  const parts = splitOrders(orderInput.value)
+  if (!parts.length) return
+  for (const val of parts) {
+    if (!orders.value.includes(val)) orders.value.push(val)
+  }
   orderInput.value = ""
 }
 
@@ -48,6 +54,8 @@ function saveEdit(i) {
   }
   cancelEdit()
 }
+
+defineExpose({ add })
 </script>
 
 <template>
@@ -59,7 +67,7 @@ function saveEdit(i) {
       variant="outlined"
       prepend-inner-icon="mdi-clipboard-text-outline"
       append-inner-icon="systemIcons:iconPlus"
-      hint="Enter, «+» или «Сохранить» — добавить в список"
+      hint="Enter, «+» или «Сохранить» — добавить в список; можно перечислить несколько номеров через запятую или пробел"
       persistent-hint
       class="mb-3"
       @keydown.enter.prevent="add"

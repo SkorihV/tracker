@@ -15,9 +15,10 @@ defineOptions({name:'TaskComment'})
 <style lang="scss" scoped>
 
 .comment-cell {
-  max-width: 260px;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
+  max-width: 500px;
 }
 </style>

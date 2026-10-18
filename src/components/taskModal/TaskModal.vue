@@ -9,6 +9,7 @@ import TaskDateFields from "./TaskDateFields.vue"
 import { isDateTimeValid } from "../../dateRules.js"
 
 const store = useAppStore()
+const ordersEditor = ref(null)
 
 const props = defineProps({
   draft: { type: Object, required: true },
@@ -58,9 +59,7 @@ const title = computed(() =>
 )
 
 function submit() {
-  const pendingOrder = form.orderInput.trim()
-  if (pendingOrder && !form.orders.includes(pendingOrder)) form.orders.push(pendingOrder)
-  form.orderInput = ""
+  ordersEditor.value?.add()
   let datesDirty = false
   if (form.start !== baseStart.value) {
     if (isDateTimeValid(form.start || "")) datesDirty = true
@@ -103,7 +102,7 @@ function onRangesSave(lines) {
 </script>
 
 <template>
-  <BaseModal persistent :title="title" @close="onClose">
+  <BaseModal max-width="900px" persistent :title="title" @close="onClose">
     <v-autocomplete
       v-model="form.user"
       :items="store.users.map((u) => ({ title: u, value: u }))"
@@ -113,32 +112,38 @@ function onRangesSave(lines) {
       prepend-inner-icon="systemIcons:iconUser"
       class="mb-3"
     />
-    <order-numbers-editor v-model:orders="form.orders" v-model:order-input="form.orderInput" />
+    <order-numbers-editor ref="ordersEditor" v-model:orders="form.orders" v-model:order-input="form.orderInput" />
     <div class="d-flex ga-4 mb-3">
-      <v-autocomplete
-        v-model="form.tags"
-        :items="store.tags.map((t) => ({ title: t.name, value: t.name }))"
-        label="Теги"
-        density="compact"
-        variant="outlined"
-        clearable
-        multiple
-        chips
-        prepend-inner-icon="mdi-tag-outline"
-        class="flex-grow-1"
-      />
-      <v-combobox
-        v-model="form.client"
-        :items="store.clients.map((c) => c.name)"
-        label="Клиент"
-        density="compact"
-        variant="outlined"
-        clearable
-        prepend-inner-icon="systemIcons:iconClient"
-        hint="Можно ввести нового клиента"
-        persistent-hint
-        class="flex-grow-1"
-      />
+      <v-row class="ga-4">
+        <v-col cols="6">
+          <v-autocomplete
+              v-model="form.tags"
+              :items="store.tags.map((t) => ({ title: t.name, value: t.name }))"
+              label="Теги"
+              density="compact"
+              variant="outlined"
+              clearable
+              multiple
+              chips
+              prepend-inner-icon="mdi-tag-outline"
+          />
+        </v-col>
+        <v-col cols="6">
+          <v-combobox
+              v-model="form.client"
+              :items="store.clients.map((c) => c.name)"
+              label="Клиент"
+              density="compact"
+              variant="outlined"
+              clearable
+              prepend-inner-icon="systemIcons:iconClient"
+              hint="Можно ввести нового клиента"
+              persistent-hint
+          />
+        </v-col>
+      </v-row>
+
+
     </div>
     <task-status-selector v-model:status="form.customStatus" v-model:our-car="form.ourCar" />
     <task-date-fields v-model:start="form.start" v-model:end="form.end" />
