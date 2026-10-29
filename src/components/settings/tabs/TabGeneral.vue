@@ -1,18 +1,24 @@
 <script setup>
 import { ref, computed, onMounted } from "vue"
 import { open } from "@tauri-apps/plugin-dialog"
-import { useAppStore, DEFAULT_ACCENT_COLOR, DEFAULT_OUR_CAR_COLOR, DEFAULT_TABLE_FONT_FAMILY, DEFAULT_TABLE_FONT_SIZE } from "../../../store.js"
+import {
+  useSettingsStore,
+  DEFAULT_ACCENT_COLOR,
+  DEFAULT_OUR_CAR_COLOR,
+  DEFAULT_TABLE_FONT_FAMILY,
+  DEFAULT_TABLE_FONT_SIZE,
+} from "../../../stores/settings.js"
 
-const store = useAppStore()
+const settingsStore = useSettingsStore()
 
-const color = ref(store.settings.accentColor || DEFAULT_ACCENT_COLOR)
+const color = ref(settingsStore.settings.accentColor || DEFAULT_ACCENT_COLOR)
 const menu = ref(false)
 
-const ourCarColor = ref(store.settings.ourCarColor || DEFAULT_OUR_CAR_COLOR)
+const ourCarColor = ref(settingsStore.settings.ourCarColor || DEFAULT_OUR_CAR_COLOR)
 const ourCarMenu = ref(false)
 
-const fontFamily = ref(store.settings.fontFamily || DEFAULT_TABLE_FONT_FAMILY)
-const fontSize = ref(store.settings.fontSize || DEFAULT_TABLE_FONT_SIZE)
+const fontFamily = ref(settingsStore.settings.fontFamily || DEFAULT_TABLE_FONT_FAMILY)
+const fontSize = ref(settingsStore.settings.fontSize || DEFAULT_TABLE_FONT_SIZE)
 
 const fontFamilyOptions = [
   "Roboto",
@@ -31,54 +37,56 @@ const fontFamilyOptions = [
 
 const fontSizeOptions = [10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24]
 
-const swatchStyle = computed(() =>
-  ({ backgroundColor: color.value || DEFAULT_ACCENT_COLOR })
-)
+const swatchStyle = computed(() => ({ backgroundColor: color.value || DEFAULT_ACCENT_COLOR }))
 
-const ourCarSwatchStyle = computed(() =>
-  ({ backgroundColor: ourCarColor.value || DEFAULT_OUR_CAR_COLOR })
-)
+const ourCarSwatchStyle = computed(() => ({ backgroundColor: ourCarColor.value || DEFAULT_OUR_CAR_COLOR }))
 
 function apply() {
-  store.setAccentColor(color.value)
+  settingsStore.setAccentColor(color.value)
   menu.value = false
 }
 
 function applyFromInput() {
   if (/^#[0-9a-fA-F]{6}$/.test(color.value.trim())) {
-    store.setAccentColor(color.value.trim())
+    settingsStore.setAccentColor(color.value.trim())
   }
 }
 
 function resetDefault() {
   color.value = DEFAULT_ACCENT_COLOR
-  store.setAccentColor(DEFAULT_ACCENT_COLOR)
+  settingsStore.setAccentColor(DEFAULT_ACCENT_COLOR)
 }
 
 function applyOurCar() {
-  store.setOurCarColor(ourCarColor.value)
+  settingsStore.setOurCarColor(ourCarColor.value)
   ourCarMenu.value = false
 }
 
 function applyOurCarFromInput() {
   if (/^#[0-9a-fA-F]{6}$/.test(ourCarColor.value.trim())) {
-    store.setOurCarColor(ourCarColor.value.trim())
+    settingsStore.setOurCarColor(ourCarColor.value.trim())
   }
 }
 
 function resetOurCarDefault() {
   ourCarColor.value = DEFAULT_OUR_CAR_COLOR
-  store.setOurCarColor(DEFAULT_OUR_CAR_COLOR)
+  settingsStore.setOurCarColor(DEFAULT_OUR_CAR_COLOR)
 }
 
 function applyFont() {
-  store.setTableFont(fontFamily.value, fontSize.value)
+  settingsStore.setTableFont(fontFamily.value, fontSize.value)
 }
 
 function resetFontDefault() {
   fontFamily.value = DEFAULT_TABLE_FONT_FAMILY
   fontSize.value = DEFAULT_TABLE_FONT_SIZE
-  store.setTableFont(DEFAULT_TABLE_FONT_FAMILY, DEFAULT_TABLE_FONT_SIZE)
+  settingsStore.setTableFont(DEFAULT_TABLE_FONT_FAMILY, DEFAULT_TABLE_FONT_SIZE)
+}
+
+const reminderHours = ref(settingsStore.settings.reminderHours)
+
+function saveTrayPrefs(minimizeToTray = settingsStore.settings.minimizeToTray) {
+  settingsStore.setTrayPrefs(minimizeToTray, reminderHours.value)
 }
 
 const defaultBackupsPath = ref("")
@@ -86,23 +94,23 @@ const backupsPath = ref("")
 const dbPath = ref("")
 
 onMounted(async () => {
-  defaultBackupsPath.value = await store.getDefaultBackupsDir()
-  const effective = await store.effectiveBackupsDir()
+  defaultBackupsPath.value = await settingsStore.getDefaultBackupsDir()
+  const effective = await settingsStore.effectiveBackupsDir()
   backupsPath.value = effective
-  dbPath.value = await store.getDbDir()
+  dbPath.value = await settingsStore.getDbDir()
 })
 
 async function pickBackupsDir() {
   const picked = await open({ directory: true, multiple: false })
   if (picked) {
     const p = String(picked)
-    await store.setBackupsDir(p)
+    await settingsStore.setBackupsDir(p)
     backupsPath.value = p
   }
 }
 
 async function resetBackupsDir() {
-  await store.setBackupsDir(defaultBackupsPath.value)
+  await settingsStore.setBackupsDir(defaultBackupsPath.value)
   backupsPath.value = defaultBackupsPath.value
 }
 </script>
@@ -113,20 +121,11 @@ async function resetBackupsDir() {
       <span class="text-body-2">Цвет кнопок и заголовков:</span>
       <v-menu v-model="menu" :close-on-content-click="false" location="bottom start">
         <template #activator="{ props: menuProps }">
-          <v-btn
-            v-bind="menuProps"
-            icon
-            size="small"
-            variant="flat"
-            aria-label="Цвет кнопок"
-            :style="swatchStyle"
-          />
+          <v-btn v-bind="menuProps" icon size="small" variant="flat" aria-label="Цвет кнопок" :style="swatchStyle" />
         </template>
         <v-sheet class="pa-2 d-flex flex-column ga-2" border>
           <v-color-picker v-model="color" mode="hex" hide-inputs :width="280" />
-          <v-btn color="primary" variant="flat" density="compact" @click="apply">
-            Применить
-          </v-btn>
+          <v-btn color="primary" variant="flat" density="compact" @click="apply"> Применить </v-btn>
         </v-sheet>
       </v-menu>
 
@@ -144,9 +143,7 @@ async function resetBackupsDir() {
         @update:model-value="color = $event.trim()"
       />
 
-      <v-btn variant="tonal" @click="resetDefault">
-        По умолчанию
-      </v-btn>
+      <v-btn variant="tonal" @click="resetDefault"> По умолчанию </v-btn>
     </div>
 
     <div class="d-flex align-center ga-3 flex-wrap">
@@ -164,9 +161,7 @@ async function resetBackupsDir() {
         </template>
         <v-sheet class="pa-2 d-flex flex-column ga-2" border>
           <v-color-picker v-model="ourCarColor" mode="hex" hide-inputs :width="280" />
-          <v-btn color="primary" variant="flat" density="compact" @click="applyOurCar">
-            Применить
-          </v-btn>
+          <v-btn color="primary" variant="flat" density="compact" @click="applyOurCar"> Применить </v-btn>
         </v-sheet>
       </v-menu>
 
@@ -184,9 +179,7 @@ async function resetBackupsDir() {
         @update:model-value="ourCarColor = $event.trim()"
       />
 
-      <v-btn variant="tonal" @click="resetOurCarDefault">
-        По умолчанию
-      </v-btn>
+      <v-btn variant="tonal" @click="resetOurCarDefault"> По умолчанию </v-btn>
     </div>
 
     <v-divider />
@@ -214,9 +207,7 @@ async function resetBackupsDir() {
           style="max-width: 130px"
           @update:model-value="applyFont"
         />
-        <v-btn variant="tonal" @click="resetFontDefault">
-          По умолчанию
-        </v-btn>
+        <v-btn variant="tonal" @click="resetFontDefault"> По умолчанию </v-btn>
       </div>
       <span class="text-caption text-medium-emphasis" :style="{ fontFamily: fontFamily, fontSize: fontSize + 'px' }">
         Пример: АаБбь 0Oo 12345
@@ -228,20 +219,45 @@ async function resetBackupsDir() {
     <div class="d-flex align-center ga-3 flex-wrap">
       <span class="text-body-2">Тема оформления:</span>
       <v-switch
-        :model-value="store.settings.theme === 'dark'"
+        :model-value="settingsStore.settings.theme === 'dark'"
         label="Тёмная"
         density="compact"
         hide-details
         color="primary"
-        @update:model-value="store.setTheme($event ? 'dark' : 'light')"
+        @update:model-value="settingsStore.setTheme($event ? 'dark' : 'light')"
       />
       <v-btn
         variant="tonal"
-        :disabled="store.settings.theme === 'light'"
-        @click="store.setTheme('light')"
+        :disabled="settingsStore.settings.theme === 'light'"
+        @click="settingsStore.setTheme('light')"
       >
         Светлая
       </v-btn>
+    </div>
+
+    <v-divider />
+
+    <div class="d-flex align-center ga-3 flex-wrap">
+      <v-switch
+        :model-value="settingsStore.settings.minimizeToTray"
+        label="Сворачивать в трей при закрытии окна"
+        density="compact"
+        hide-details
+        color="primary"
+        @update:model-value="saveTrayPrefs(!!$event)"
+      />
+      <v-text-field
+        v-model.number="reminderHours"
+        type="number"
+        min="0"
+        max="72"
+        label="Напоминать о таймере, идущем дольше (часов, 0 — выкл.)"
+        density="compact"
+        variant="outlined"
+        hide-details
+        style="max-width: 420px"
+        @change="saveTrayPrefs()"
+      />
     </div>
 
     <v-divider />
@@ -259,18 +275,12 @@ async function resetBackupsDir() {
           variant="tonal"
           prepend-icon="systemIcons:iconFolder"
           :disabled="!backupsPath"
-          @click="store.openInExplorer(backupsPath)"
+          @click="settingsStore.openInExplorer(backupsPath)"
         >
           Открыть в проводнике
         </v-btn>
-        <v-btn variant="tonal" prepend-icon="systemIcons:iconFolder" @click="pickBackupsDir">
-          Выбрать
-        </v-btn>
-        <v-btn
-          variant="tonal"
-          :disabled="!store.settings.backupDir"
-          @click="resetBackupsDir"
-        >
+        <v-btn variant="tonal" prepend-icon="systemIcons:iconFolder" @click="pickBackupsDir"> Выбрать </v-btn>
+        <v-btn variant="tonal" :disabled="!settingsStore.settings.backupDir" @click="resetBackupsDir">
           По умолчанию
         </v-btn>
       </div>
@@ -289,7 +299,7 @@ async function resetBackupsDir() {
           variant="tonal"
           prepend-icon="systemIcons:iconFolder"
           :disabled="!dbPath"
-          @click="store.openInExplorer(dbPath)"
+          @click="settingsStore.openInExplorer(dbPath)"
         >
           Открыть в проводнике
         </v-btn>

@@ -1,17 +1,15 @@
 <script setup>
-import {defineProps} from 'vue'
+import { defineProps } from "vue"
 
-const props = defineProps({
-  task: Object
+defineProps({
+  task: Object,
 })
 
-defineOptions({name:'TaskStart'})
+defineOptions({ name: "TaskStart" })
 </script>
 
 <template>
   <span class="mono">{{ task.start }}</span>
 </template>
 
-<style lang="scss" scoped>
-
-</style>
+<style lang="scss" scoped></style>

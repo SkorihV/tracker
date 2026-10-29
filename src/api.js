@@ -1,10 +1,18 @@
 import { invoke } from "@tauri-apps/api/core"
 
+let errorHandler = null
+
+/** Зарегистрировать обработчик, который получает текст любой ошибки команды. */
+export function onApiError(handler) {
+  errorHandler = handler
+}
+
 async function call(cmd, args) {
   try {
     return await invoke(cmd, args)
   } catch (e) {
     console.error(`[${cmd}]`, e)
+    errorHandler?.(String(e))
     throw e
   }
 }
@@ -15,36 +23,29 @@ function cleanFilter(f) {
   return out
 }
 
+/** Оболочка над командами Tauri. Типы аргументов — в src-tauri/src/commands.rs. */
 export const api = {
-  /** Получить всё состояние приложения: settings, users, tags, clients, statuses. */
+  /** Настройки и справочники: { settings, users, tags, clients, statuses }. */
   getState: () => call("get_state"),
 
-  /** Выполнить запрос задач по фильтру. Возвращает { rows, totals }. Строки — только заявки (group-строки и поле kind отбрасываются). */
+  /** Задачи по фильтру: { rows, totals }. Групповые строки отбрасываются. */
   query: async (filter) => {
     const res = await call("query", { filter: cleanFilter(filter) })
     return {
       ...res,
-      rows: (res.rows || [])
-        .filter((r) => r.kind !== "group")
-        .map(({ kind, ...row }) => row),
+      rows: (res.rows || []).filter((r) => r.kind !== "group").map(({ kind: _kind, ...row }) => row),
     }
   },
 
-  /** Предпросмотр отчёта (данные на экране, без записи файла). */
   reportPreview: (filter) => call("report_preview", { filter: cleanFilter(filter) }),
-
-  /** Сформировать файл отчёта. path (необязательно) — куда сохранить; иначе reports/. Возвращает путь. */
-  createReport: (format, filter, dateFrom, dateTo, path = "") =>
-    call("create_report", { format, filter: cleanFilter(filter), dateFrom, dateTo, path }),
-
-  /** Предпросмотр статистики (на экран, без записи файла). */
   statsPreview: (filter) => call("stats_preview", { filter: cleanFilter(filter) }),
 
-  /** Сформировать файл статистики. path (необязательно) — куда сохранить; иначе reports/. Возвращает путь. */
+  /** Сформировать файл отчёта (txt | md | csv | xlsx). Без path — в reports/. Возвращает путь. */
+  createReport: (format, filter, dateFrom, dateTo, path = "") =>
+    call("create_report", { format, filter: cleanFilter(filter), dateFrom, dateTo, path }),
   createStats: (format, filter, dateFrom, dateTo, path = "") =>
     call("create_stats", { format, filter: cleanFilter(filter), dateFrom, dateTo, path }),
 
-  /** Экспортировать данные в JSON-файл по указанному пути. */
   exportJson: (path, opts) =>
     call("export_json", {
       path,
@@ -54,8 +55,6 @@ export const api = {
       exportUsers: opts.users,
       exportStatuses: opts.statuses,
     }),
-
-  /** Импортировать данные из JSON-файла по указанному пути. */
   importJson: (path, opts) =>
     call("import_json", {
       path,
@@ -66,113 +65,31 @@ export const api = {
       importStatuses: opts.statuses,
     }),
 
-  /** Создать задачу из черновика { user, order, tags, client, comment, customStatus }. Возвращает AppTask. */
-  createTask: (d) => call("create_task", d),
-
-  /** Обновить задачу из черновика (те же поля, что у createTask). */
-  updateTask: (d) => call("update_task", d),
-
-  /** Установить пользовательский статус задачи (справочник статусов). */
+  /** draft: { user, orders, tags, client, comment, customStatus, ourCar }. */
+  createTask: (draft) => call("create_task", { draft }),
+  updateTask: (taskId, draft) => call("update_task", { taskId, draft }),
   setTaskStatus: (taskId, status) => call("set_task_status", { taskId, status }),
-
-  /** Переопределить даты начала/завершения задачи. */
   setTaskDates: (taskId, start, end) => call("set_task_dates", { taskId, start, end }),
-
-  /** Переопределить список интервалов работы задачи (строки "HH:MM-HH:MM"). */
   setTaskIntervals: (taskId, lines) => call("set_task_intervals", { taskId, lines }),
-
-  /** Запустить задачу (старт замера времени). */
-  startTask: (taskId) => call("start_task", { taskId }),
-
-  /** Поставить задачу на паузу. */
-  pauseTask: (taskId) => call("pause_task", { taskId }),
-
-  /** Возобновить задачу после паузы. */
-  resumeTask: (taskId) => call("resume_task", { taskId }),
-
-  /** Завершить задачу (фиксация итогового времени). */
-  completeTask: (taskId) => call("complete_task", { taskId }),
-
-  /** Удалить задачи по ID. */
+  /** action: start | pause | resume | complete */
+  taskAction: (taskId, action) => call("task_action", { taskId, action }),
   removeTasks: (ids) => call("remove_tasks", { ids }),
 
-  /** Сохранить настройки: имя пользователя, режим группировки, акцентный цвет. */
-  setSettings: (username, grouping, accentColor) => call("set_settings", { username, grouping, accentColor }),
-  /** Сохранить цвет ячейки «Наша машина». */
-  setOurCarColor: (color) => call("set_our_car_color", { color }),
-  /** Сохранить порядок и видимость колонок таблицы. */
-  setColumns: (columns) => call("set_columns", { columns }),
+  /**
+   * Правка справочника. kind: user | tag | client | status;
+   * action: { action: "add" | "rename" | "remove" | "move" | "clear" | "color", ... }.
+   */
+  editDictionary: (kind, action) => call("edit_dictionary", { kind, action }),
 
-  /** Сохранить пользовательский каталог бэкапов ("" = по умолчанию). */
+  setSettings: (username, grouping, accentColor) => call("set_settings", { username, grouping, accentColor }),
+  setOurCarColor: (color) => call("set_our_car_color", { color }),
+  setColumns: (columns) => call("set_columns", { columns }),
+  setTrayPrefs: (minimizeToTray, reminderHours) => call("set_tray_prefs", { minimizeToTray, reminderHours }),
   setBackupsDir: (dir) => call("set_backups_dir", { dir }),
 
-  /** Получить путь бэкапов по умолчанию. */
   getDefaultBackupsDir: () => call("default_backups_dir"),
   getDbDir: () => call("db_dir"),
   openInExplorer: (dir) => call("open_in_explorer", { path: dir }),
-
-  /** Добавить пользователя в справочник. */
-  addUser: (name) => call("add_user", { name }),
-
-  /** Удалить пользователя из справочника. */
-  removeUser: (name) => call("remove_user", { name }),
-
-  /** Удалить всех пользователей из справочника. */
-  clearUsers: () => call("clear_users"),
-
-  /** Переименовать пользователя. */
-  renameUser: (old, newName) => call("rename_user", { old, new: newName }),
-
-  /** Переместить пользователя в списке (from → to). */
-  moveUser: (from, to) => call("move_user", { from, to }),
-
-  /** Добавить тег в справочник. */
-  addTag: (name) => call("add_tag", { name }),
-
-  /** Удалить тег по ID (с каскадным удалением из задач). */
-  removeTag: (id) => call("remove_tag", { id }),
-
-  /** Удалить все теги из справочника. */
-  clearTags: () => call("clear_tags"),
-
-  /** Переименовать тег (обновляется во всех задачах). */
-  renameTag: (old, newName) => call("rename_tag", { old, new: newName }),
-
-  /** Переместить тег в списке (from → to). */
-  moveTag: (from, to) => call("move_tag", { from, to }),
-
-  /** Добавить клиента в справочник. */
-  addClient: (name) => call("add_client", { name }),
-
-  /** Удалить клиента по ID. */
-  removeClient: (id) => call("remove_client", { id }),
-
-  /** Удалить всех клиентов из справочника. */
-  clearClients: () => call("clear_clients"),
-
-  /** Переименовать клиента. */
-  renameClient: (old, newName) => call("rename_client", { old, new: newName }),
-
-  /** Переместить клиента в списке (from → to). */
-  moveClient: (from, to) => call("move_client", { from, to }),
-
-  /** Добавить статус в справочник (name + color). */
-  addStatus: (name, color) => call("add_status", { name, color }),
-
-  /** Удалить статус по ID (задачи получают пустой статус). */
-  removeStatus: (id) => call("remove_status", { id }),
-
-  /** Удалить все статусы из справочника (у задач статус сбрасывается). */
-  clearStatuses: () => call("clear_statuses"),
-
-  /** Переименовать статус (обновляется во всех задачах). */
-  renameStatus: (old, newName) => call("rename_status", { old, new: newName }),
-
-  /** Установить цвет статуса по ID. */
-  setStatusColor: (id, color) => call("set_status_color", { id, color }),
-
-  /** Переместить статус в списке (from → to). */
-  moveStatus: (from, to) => call("move_status", { from, to }),
 }
 
 export function fmtTd(seconds) {

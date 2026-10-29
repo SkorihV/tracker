@@ -1,6 +1,5 @@
 <script setup>
-
-defineOptions({name:'TaskNoData'})
+defineOptions({ name: "TaskNoData" })
 </script>
 
 <template>

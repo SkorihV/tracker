@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run build
+
+  rust:
+    # Приложение собирается под Windows, поэтому и проверяется там.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            src-tauri
+            src-tauri/core
+      - name: Фронтенд (нужен dist для tauri::generate_context)
+        run: |
+          npm ci
+          npm run build
+      - name: Clippy и тесты ядра
+        working-directory: src-tauri/core
+        run: |
+          cargo clippy --all-targets -- -D warnings
+          cargo test
+      - name: Clippy приложения
+        working-directory: src-tauri
+        run: cargo clippy --all-targets -- -D warnings

@@ -7,8 +7,8 @@ import { vMaska } from "maska/vue"
 import "./styles.css"
 
 createApp(App)
-    .use(createPinia())
-    .use(vuetify)
-    .directive("dialog-drag", dialogDrag)
-    .directive("maska", vMaska)
-    .mount("#app")
+  .use(createPinia())
+  .use(vuetify)
+  .directive("dialog-drag", dialogDrag)
+  .directive("maska", vMaska)
+  .mount("#app")

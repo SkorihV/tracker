@@ -2,10 +2,10 @@
 import { ref, reactive } from "vue"
 import { save, open } from "@tauri-apps/plugin-dialog"
 import { api } from "../../api.js"
-import { useAppStore } from "../../store.js"
+import { useAppStore } from "../../stores/app.js"
 import BaseModal from "../base/BaseModal.vue"
 
-const store = useAppStore()
+const appStore = useAppStore()
 const emit = defineEmits(["close"])
 
 const tab = ref("export")
@@ -81,8 +81,7 @@ async function doImport() {
       users: importOpts.users,
       statuses: importOpts.statuses,
     })
-    await store.refresh()
-    await store.refreshQuery()
+    await appStore.sync()
     notice.value = `Импортировано из: ${importOpts.path}`
   } catch (e) {
     error.value = String(e)
@@ -119,20 +118,18 @@ async function doImport() {
 
     <template v-else>
       <div class="d-flex ga-2">
-      <v-text-field
-        :model-value="importOpts.path"
-        label="Файл для импорта"
-        placeholder="не выбран"
-        density="compact"
-        variant="outlined"
-        readonly
-        class="mb-2"
-        :append-inner-icon="importOpts.path ? 'systemIcons:iconClose' : undefined"
-        @click:append-inner="importOpts.path = ''"
-      />
-      <v-btn variant="tonal" prepend-icon="systemIcons:iconImport" @click="pickFile">
-        Выбрать
-      </v-btn>
+        <v-text-field
+          :model-value="importOpts.path"
+          label="Файл для импорта"
+          placeholder="не выбран"
+          density="compact"
+          variant="outlined"
+          readonly
+          class="mb-2"
+          :append-inner-icon="importOpts.path ? 'systemIcons:iconClose' : undefined"
+          @click:append-inner="importOpts.path = ''"
+        />
+        <v-btn variant="tonal" prepend-icon="systemIcons:iconImport" @click="pickFile"> Выбрать </v-btn>
       </div>
       <v-checkbox v-model="importOpts.tasks" label="Задачи" density="compact" hide-details />
       <v-checkbox v-model="importOpts.tags" label="Теги" density="compact" hide-details />
@@ -149,7 +146,13 @@ async function doImport() {
         </v-btn>
       </template>
       <template v-else>
-        <v-btn color="primary" variant="flat" prepend-icon="systemIcons:iconImport" :disabled="busy || !importOpts.path" @click="doImport">
+        <v-btn
+          color="primary"
+          variant="flat"
+          prepend-icon="systemIcons:iconImport"
+          :disabled="busy || !importOpts.path"
+          @click="doImport"
+        >
           Импортировать
         </v-btn>
       </template>

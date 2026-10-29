@@ -32,6 +32,9 @@ impl ColumnPref {
     }
 }
 
+/// Максимум для порога напоминания о забытом таймере, часов.
+pub const MAX_REMINDER_HOURS: u32 = 72;
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Settings {
     pub username: String,
@@ -40,6 +43,8 @@ pub struct Settings {
     pub our_car_color: String, // цвет ячейки «Наша машина» (hex "#rrggbb")
     pub columns: Vec<ColumnPref>, // порядок и видимость колонок таблицы
     pub backup_dir: String, // пользовательский каталог бэкапов ("") = по умолчанию
+    pub minimize_to_tray: bool, // закрытие окна сворачивает в трей
+    pub reminder_hours: u32, // напоминать о задаче, идущей дольше N часов (0 = выкл.)
 }
 
 impl Default for Settings {
@@ -51,6 +56,8 @@ impl Default for Settings {
             our_car_color: "#2196f3".into(),
             columns: Vec::new(),
             backup_dir: String::new(),
+            minimize_to_tray: false,
+            reminder_hours: 0,
         }
     }
 }
@@ -83,6 +90,15 @@ impl Settings {
             .and_then(|x| x.as_str())
             .unwrap_or("")
             .to_string();
+        let minimize_to_tray = obj
+            .and_then(|o| o.get("minimize_to_tray"))
+            .and_then(|x| x.as_bool())
+            .unwrap_or(false);
+        let reminder_hours = obj
+            .and_then(|o| o.get("reminder_hours"))
+            .and_then(|x| x.as_u64())
+            .map(|n| n.min(MAX_REMINDER_HOURS as u64) as u32)
+            .unwrap_or(0);
         Settings {
             username: obj
                 .and_then(|o| o.get("username"))
@@ -94,6 +110,8 @@ impl Settings {
             our_car_color,
             columns,
             backup_dir,
+            minimize_to_tray,
+            reminder_hours,
         }
     }
 
@@ -105,6 +123,8 @@ impl Settings {
             "our_car_color": self.our_car_color,
             "columns": self.columns,
             "backup_dir": self.backup_dir,
+            "minimize_to_tray": self.minimize_to_tray,
+            "reminder_hours": self.reminder_hours,
         })
     }
 }
@@ -182,7 +202,7 @@ impl TaskStatus {
         }
     }
 
-    pub fn from_str(s: &str) -> TaskStatus {
+    pub fn parse(s: &str) -> TaskStatus {
         match s {
             "running" => TaskStatus::Running,
             "paused" => TaskStatus::Paused,
@@ -306,7 +326,7 @@ impl Task {
             orders: orders_from_json(obj),
             tags: tags_from_json(obj),
             client: str_at(obj, "client"),
-            status: TaskStatus::from_str(&str_at(obj, "status")),
+            status: TaskStatus::parse(&str_at(obj, "status")),
             custom_status: str_at(obj, "custom_status"),
             comment: str_at(obj, "comment"),
             intervals,
@@ -513,7 +533,6 @@ pub struct AppState {
     pub tags: Vec<Entity>,
     pub clients: Vec<Entity>,
     pub statuses: Vec<StatusDef>,
-    pub tasks: Vec<AppTask>,
 }
 
 // Типы, удобные для команд: создание и правка задачи.

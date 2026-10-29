@@ -63,7 +63,7 @@ fn round_trip_preserves_data() {
     let before: serde_json::Value = serde_json::from_str(&fs::read_to_string(&db).unwrap()).unwrap();
     {
         let st = Store::open(db.clone());
-        st.save();
+        st.save().unwrap();
     }
     let after: serde_json::Value = serde_json::from_str(&fs::read_to_string(&db).unwrap()).unwrap();
     assert_eq!(
@@ -184,29 +184,29 @@ let t = st.create_task(TaskDraft {
         comment: "".into(),
         custom_status: "".into(),
         our_car: false,
-    });
+    }).unwrap();
     assert_eq!(st.tasks.len(), before_n + 1);
     assert_eq!(t.status, "running");
     assert!(!t.task_id.is_empty());
     assert!(st.users.iter().any(|u| u == "Тест 1"));
 
-    st.pause_task(&t.task_id);
+    st.pause_task(&t.task_id).unwrap();
     assert_eq!(st.tasks.last().unwrap().status, TaskStatus::Paused);
-    st.resume_task(&t.task_id);
+    st.resume_task(&t.task_id).unwrap();
     assert_eq!(st.tasks.last().unwrap().status, TaskStatus::Running);
-    st.complete_task(&t.task_id);
+    st.complete_task(&t.task_id).unwrap();
     assert_eq!(st.tasks.last().unwrap().status, TaskStatus::Completed);
 
     st.update_task(
         &t.task_id,
         TaskDraft { user: "Второй".into(), orders: vec!["R-2".into()], tags: vec!["Тонкий".into()], client: "Клиент 1".into(), comment: "".into(), custom_status: "".into(), our_car: false },
-    );
+    ).unwrap();
     let last = st.tasks.last().unwrap();
     assert_eq!(last.orders, vec!["R-2".to_string()]);
     assert_eq!(last.tags, vec!["Тонкий"]);
     assert!(st.users.iter().any(|u| u == "Второй"), "пользователь добавляется автоматически");
 
-    st.remove_task(&t.task_id);
+    st.remove_task(&t.task_id).unwrap();
     assert_eq!(st.tasks.len(), before_n);
 
     // повторное открытие из файла после мутаций
@@ -230,7 +230,7 @@ let t = st.create_task(TaskDraft {
         comment: "".into(),
         custom_status: "".into(),
         our_car: false,
-    });
+    }).unwrap();
 
     // Поля редактора «Начало / Завершение» меняют последний диапазон.
     st.set_task_dates(&t.task_id, "01.01.2026 09:00".into(), "01.01.2026 10:30".into())
@@ -296,7 +296,7 @@ let t2 = st.create_task(TaskDraft {
                             comment: "".into(),
                             custom_status: "".into(),
                             our_car: false,
-                        });
+                        }).unwrap();
     st.set_task_intervals(
         &t2.task_id,
         vec!["01.01.2026 08:00 — 01.01.2026 09:00".into(), "02.01.2026 08:00 — 09:00".into()],
@@ -316,9 +316,9 @@ fn tags_and_statuses() {
     let db = dir.join("data").join("time_tracker_v2_data.json");
     let mut st = Store::open(db.clone());
 
-    st.add_status("Новая", "blue");
-    st.add_status("В работе", "orange");
-    st.add_status("Новая", "green"); // дубль имени игнорируется
+    st.add_status("Новая", "blue").unwrap();
+    st.add_status("В работе", "orange").unwrap();
+    st.add_status("Новая", "green").unwrap(); // дубль имени игнорируется
     assert_eq!(st.statuses.len(), 2);
     assert_eq!(st.statuses[0].color, "blue");
 
@@ -330,18 +330,18 @@ fn tags_and_statuses() {
         comment: "".into(),
         custom_status: "Новая".into(),
         our_car: false,
-    });
+    }).unwrap();
     // Теги и статус автоматически добавлены в справочники.
     assert!(st.tags.iter().any(|e| e.name == "Альфа"));
     assert!(st.tags.iter().any(|e| e.name == "Бета"));
 
-    st.set_task_status(&t.task_id, "В работе".into());
+    st.set_task_status(&t.task_id, "В работе".into()).unwrap();
     let task = st.tasks.iter().find(|x| x.task_id == t.task_id).unwrap();
     assert_eq!(task.custom_status, "В работе");
     assert_eq!(task.tags, vec!["Альфа", "Бета"]);
 
     // Переименование статуса каскадно обновляет задачи.
-    st.rename_status("В работе", "В прогрессе");
+    st.rename_status("В работе", "В прогрессе").unwrap();
     let task = st.tasks.iter().find(|x| x.task_id == t.task_id).unwrap();
     assert_eq!(task.custom_status, "В прогрессе");
 
@@ -352,12 +352,12 @@ fn tags_and_statuses() {
         .find(|s| s.name == "В прогрессе")
         .unwrap()
         .id;
-    st.remove_status(in_progress_id);
+    st.remove_status(in_progress_id).unwrap();
     let task = st.tasks.iter().find(|x| x.task_id == t.task_id).unwrap();
     assert_eq!(task.custom_status, "");
 
     // Переименование тега каскадно.
-    st.rename_tag("Альфа", "Альфа2");
+    st.rename_tag("Альфа", "Альфа2").unwrap();
     let task = st.tasks.iter().find(|x| x.task_id == t.task_id).unwrap();
     assert_eq!(task.tags, vec!["Альфа2", "Бета"]);
 
@@ -384,12 +384,12 @@ fn tags_and_statuses() {
     }
 
     // Формат файла: поле tag (строка) для совместимости + tags-массив.
-    st.save();
+    st.save().unwrap();
     let raw = fs::read_to_string(&db).unwrap();
     assert!(raw.contains("\"tags\""));
     assert!(raw.contains("\"custom_status\""));
     assert!(raw.contains("\"statuses\""));
-    st.remove_task(&t.task_id);
+    st.remove_task(&t.task_id).unwrap();
 
     // Старый формат: задача с одним строковым тегом загружается в tags.
     let db2 = dir.join("data").join("legacy.json");

@@ -1,8 +1,8 @@
 <script setup>
-import {defineProps} from 'vue'
+import { defineProps } from "vue"
 
-const props = defineProps({
-  task: Object
+defineProps({
+  task: Object,
 })
 
 const statusMeta = {
@@ -17,7 +17,7 @@ const statusLabel = {
   completed: "Завершена",
 }
 
-defineOptions({name:'TaskMode'})
+defineOptions({ name: "TaskMode" })
 </script>
 
 <template>
@@ -29,6 +29,4 @@ defineOptions({name:'TaskMode'})
   </v-chip>
 </template>
 
-<style lang="scss" scoped>
-
-</style>
+<style lang="scss" scoped></style>

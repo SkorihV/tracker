@@ -1,9 +1,9 @@
 <script setup>
 import { ref, nextTick } from "vue"
 import BaseConfirmDialog from "../base/BaseConfirmDialog.vue"
-import { useAppStore } from "../../store.js"
+import { useSettingsStore } from "../../stores/settings.js"
 
-const store = useAppStore()
+const settingsStore = useSettingsStore()
 
 const orders = defineModel("orders", { type: Array, default: () => [] })
 const orderInput = defineModel("orderInput", { type: String, default: "" })
@@ -13,7 +13,10 @@ const editInputs = {}
 const pendingClear = ref(false)
 
 function splitOrders(s) {
-  return s.split(/[,\s]+/).map((x) => x.trim()).filter(Boolean)
+  return s
+    .split(/[,\s]+/)
+    .map((x) => x.trim())
+    .filter(Boolean)
 }
 
 function add() {
@@ -56,6 +59,11 @@ function saveEdit(i) {
 }
 
 defineExpose({ add })
+
+function clearOrders() {
+  orders.value = []
+  pendingClear.value = false
+}
 </script>
 
 <template>
@@ -73,17 +81,16 @@ defineExpose({ add })
       @keydown.enter.prevent="add"
       @click:append-inner="add"
     />
-    <v-list
-      v-if="orders.length"
-      variant="outlined"
-      density="compact"
-      class="order-list mb-1"
-    >
-      <v-list-item density="compact" v-for="(o, i) in orders" :key="i" class="px-2">
+    <v-list v-if="orders.length" variant="outlined" density="compact" class="order-list mb-1">
+      <v-list-item v-for="(o, i) in orders" :key="i" density="compact" class="px-2">
         <template v-if="editingIndex === i">
           <div class="d-flex align-center ga-2">
             <v-text-field
-              :ref="(el) => { if (el) editInputs[i] = el; }"
+              :ref="
+                (el) => {
+                  if (el) editInputs[i] = el
+                }
+              "
               v-model="editName"
               density="compact"
               class="order-item"
@@ -95,22 +102,24 @@ defineExpose({ add })
               @blur="cancelEdit"
             />
             <v-btn
-                icon="systemIcons:iconCheck"
-                aria-label="Сохранить"
-                :variant="editDirty(i) ? 'flat' : 'text'"
-                size="x-small"
-                :disabled="!editDirty(i)"
-                :color="editDirty(i) ? store.settings.accentColor : undefined"
-                @mousedown.prevent
-                @click="saveEdit(i)">
+              icon="systemIcons:iconCheck"
+              aria-label="Сохранить"
+              :variant="editDirty(i) ? 'flat' : 'text'"
+              size="x-small"
+              :disabled="!editDirty(i)"
+              :color="editDirty(i) ? settingsStore.settings.accentColor : undefined"
+              @mousedown.prevent
+              @click="saveEdit(i)"
+            >
             </v-btn>
             <v-btn
-                icon="systemIcons:iconClose"
-                aria-label="Отмена"
-                variant="text"
-                size="x-small"
-                @mousedown.prevent
-                @click="cancelEdit">
+              icon="systemIcons:iconClose"
+              aria-label="Отмена"
+              variant="text"
+              size="x-small"
+              @mousedown.prevent
+              @click="cancelEdit"
+            >
             </v-btn>
           </div>
         </template>
@@ -118,35 +127,37 @@ defineExpose({ add })
           <div class="d-flex align-center">
             <span class="ml-4 flex-grow-1 text-truncate">{{ o }}</span>
             <v-btn
-                icon="systemIcons:iconEdit"
-                aria-label="Редактировать"
-                variant="text"
-                size="x-small"
-                tabindex="-1"
-                @click="startEdit(i)">
+              icon="systemIcons:iconEdit"
+              aria-label="Редактировать"
+              variant="text"
+              size="x-small"
+              tabindex="-1"
+              @click="startEdit(i)"
+            >
             </v-btn>
-            <v-btn icon="systemIcons:iconTrash"
-                   aria-label="Удалить"
-                   variant="text"
-                   size="x-small"
-                   tabindex="-1"
-                   color="error" @click="remove(i)">
+            <v-btn
+              icon="systemIcons:iconTrash"
+              aria-label="Удалить"
+              variant="text"
+              size="x-small"
+              tabindex="-1"
+              color="error"
+              @click="remove(i)"
+            >
             </v-btn>
           </div>
         </template>
       </v-list-item>
     </v-list>
     <div v-if="orders.length" class="d-flex justify-end mb-3">
-      <v-btn variant="tonal" color="error" tabindex="-1" size="small" @click="pendingClear = true">
-        Удалить все
-      </v-btn>
+      <v-btn variant="tonal" color="error" tabindex="-1" size="small" @click="pendingClear = true"> Удалить все </v-btn>
     </div>
 
     <BaseConfirmDialog
       v-if="pendingClear"
       title="Удалить все номера заявок?"
       message="Все номера заявок будут удалены из задачи. Продолжить?"
-      @confirm="orders = []; pendingClear = false"
+      @confirm="clearOrders"
       @close="pendingClear = false"
     />
   </div>
@@ -160,7 +171,6 @@ defineExpose({ add })
     :deep(.v-field__input) {
       min-height: 16px;
       padding-block: 4px;
-
     }
   }
 }

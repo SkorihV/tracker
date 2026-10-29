@@ -1,32 +1,29 @@
 <script setup>
-import {defineProps} from 'vue'
-import {useAppStore} from "../../../store.js"
-const store = useAppStore()
+import { defineProps } from "vue"
+import { useTasksStore } from "../../../stores/tasks.js"
+const tasksStore = useTasksStore()
 
-const props = defineProps({
-  task: Object
+defineProps({
+  task: Object,
 })
 
 const emit = defineEmits(["edit", "delete"])
 
-
 async function onPause(task) {
-  if (task.mode === "running") await store.pauseTask(task.taskId)
+  if (task.mode === "running") await tasksStore.taskAction(task.taskId, "pause")
 }
 
 async function onComplete(task) {
-  await store.completeTask(task.taskId)
+  await tasksStore.taskAction(task.taskId, "complete")
 }
 
 async function onStart(task) {
   if (task.mode === "running") return
-  if (task.mode === "paused") await store.resumeTask(task.taskId)
-  else await store.startTask(task.taskId)
+  if (task.mode === "paused") await tasksStore.taskAction(task.taskId, "resume")
+  else await tasksStore.taskAction(task.taskId, "start")
 }
-defineOptions({name:'TaskActions'})
+defineOptions({ name: "TaskActions" })
 </script>
-
-
 
 <template>
   <div class="d-flex ga-1">
@@ -42,7 +39,7 @@ defineOptions({name:'TaskActions'})
       <v-sheet v-tooltip:bottom="'Возобновить'" color="transparent" @click.stop="onStart(task)">
         <v-icon size="large" icon="systemIcons:iconPlay" color="green" />
       </v-sheet>
-      <v-sheet disabled v-tooltip:bottom="'Завершить'" color="transparent" @click.stop="onComplete(task)">
+      <v-sheet v-tooltip:bottom="'Завершить'" disabled color="transparent" @click.stop="onComplete(task)">
         <v-icon size="large" icon="systemIcons:iconStop" color="red" />
       </v-sheet>
     </template>
@@ -64,6 +61,4 @@ defineOptions({name:'TaskActions'})
   </div>
 </template>
 
-<style scoped>
-
-</style>
+<style scoped></style>

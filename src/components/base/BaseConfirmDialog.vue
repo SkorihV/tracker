@@ -27,17 +27,12 @@ onMounted(() => window.addEventListener("keydown", onKeydown))
 onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown))
 
 defineOptions({
-  name: 'BaseConfirmDialog'
+  name: "BaseConfirmDialog",
 })
-
 </script>
 
 <template>
-  <v-dialog
-    model-value
-    :max-width="maxWidth"
-    @update:model-value="(v) => !v && emit('close')"
-  >
+  <v-dialog model-value :max-width="maxWidth" @update:model-value="(v) => !v && emit('close')">
     <v-card class="modal-card">
       <v-toolbar v-dialog-drag density="compact" :color="color">
         <v-toolbar-title>{{ title }}</v-toolbar-title>

@@ -26,10 +26,6 @@ body,
   cursor: pointer;
 }
 
-
-
-
-
 .modal-card {
   display: flex;
   flex-direction: column;

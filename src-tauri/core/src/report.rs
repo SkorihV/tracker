@@ -1,6 +1,9 @@
 //! Отчёты и статистика: фильтрация задач, предпросмотр,
 //! запись TXT/MD/CSV(cp1251)/XLSX в папку reports/ (как Python-версия).
 
+// Функции записи отчётов принимают набор независимых параметров формата и периода.
+#![allow(clippy::too_many_arguments)]
+
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
@@ -162,6 +165,7 @@ pub struct Stats {
     pub by_client: Vec<StatsLine>,
     pub by_tag: Vec<StatsLine>,
     pub by_month: Vec<StatsLine>,
+    pub by_client_user: Vec<StatsLine>,
 }
 
 // ---------------------------------------------------------------------
@@ -215,7 +219,7 @@ pub fn filtered_tasks<'a>(tasks: &'a [Task], f: &TaskFilter) -> Vec<&'a Task> {
         }
         out.push(t);
     }
-    out.sort_by(|a, b| b.start_date().cmp(&a.start_date()));
+    out.sort_by_key(|t| std::cmp::Reverse(t.start_date()));
     out
 }
 
@@ -268,10 +272,10 @@ fn group_stats<'a>(tasks: &[&'a Task], key: impl Fn(&'a Task) -> String, now: ch
         })
         .collect();
     lines.sort_by(|a, b| {
-        let ok = fmt_to_secs(&b.total_label)
+        
+        fmt_to_secs(&b.total_label)
             .partial_cmp(&fmt_to_secs(&a.total_label))
-            .unwrap_or(std::cmp::Ordering::Equal);
-        ok
+            .unwrap_or(std::cmp::Ordering::Equal)
     });
     lines
 }
@@ -395,6 +399,10 @@ pub fn statistics(tasks: &[Task], f: &TaskFilter) -> Stats {
     }, now);
     let by_tag = tag_stats(&list, now);
     let by_month = group_stats(&list, |t| t.start_date().format("%Y-%m").to_string(), now);
+    let by_client_user = group_stats(&list, |t| {
+        let or_none = |s: &str| if s.is_empty() { "(не указан)".to_string() } else { s.to_string() };
+        format!("{} / {}", or_none(&t.client), or_none(&t.user))
+    }, now);
 
     Stats {
         count,
@@ -404,6 +412,7 @@ pub fn statistics(tasks: &[Task], f: &TaskFilter) -> Stats {
         by_client,
         by_tag,
         by_month,
+        by_client_user,
     }
 }
 
@@ -661,7 +670,7 @@ fn report_txt(list: &[&Task], secs: f64, tag_map: &HashMap<String, f64>, date_fr
 
 fn report_md(list: &[&Task], secs: f64, tag_map: &HashMap<String, f64>, date_from: &str, date_to: &str) -> String {
     let mut lines = Vec::new();
-    lines.push(format!("# Отчёт по времени\n"));
+    lines.push("# Отчёт по времени\n".to_string());
     lines.push(format!("**Период:** {}\n", fmt_period(date_from, date_to)));
     lines.push(format!("**Записей:** {}  ", list.len()));
     lines.push(format!("**Общее время:** {}\n", fmt_td(secs)));
@@ -743,7 +752,7 @@ fn write_report_xlsx(
     let mut row = 0u32;
     ws.write_string_with_format(row, 0, "ОТЧЁТ ПО ВРЕМЕНИ", &header).map_err(err)?;
     row += 1;
-    ws.write_string(row, 0, &fmt_period(date_from, date_to)).map_err(err)?;
+    ws.write_string(row, 0, fmt_period(date_from, date_to)).map_err(err)?;
     row += 2;
     ws.write_string(row, 0, format!("Записей: {}", list.len())).map_err(err)?;
     ws.write_string(row, 1, format!("Общее время: {}", fmt_td(secs))).map_err(err)?;
@@ -767,7 +776,7 @@ fn write_report_xlsx(
     let now = now_naive();
     for t in list {
         for (col, k) in keys.iter().enumerate() {
-            ws.write_string(row, col as u16, &report_cell(t, k, now)).map_err(err)?;
+            ws.write_string(row, col as u16, report_cell(t, k, now)).map_err(err)?;
         }
         row += 1;
     }
@@ -778,12 +787,13 @@ fn write_report_xlsx(
     wb.save(path).map_err(err)
 }
 
-fn stats_sections(st: &Stats) -> [(&'static str, &[StatsLine]); 4] {
+fn stats_sections(st: &Stats) -> [(&'static str, &[StatsLine]); 5] {
     [
         ("По пользователям", &st.by_user),
         ("По клиентам", &st.by_client),
         ("По тегам", &st.by_tag),
         ("По месяцам", &st.by_month),
+        ("Клиент / пользователь", &st.by_client_user),
     ]
 }
 
@@ -844,48 +854,44 @@ fn write_stats_xlsx(path: &Path, st: &Stats, date_from: &str, date_to: &str, acc
 
     let mut wb = Workbook::new();
     let ws = wb.add_worksheet();
-    ws.set_name("Статистика").map_err(e2s)?;
+    ws.set_name("Статистика").map_err(err)?;
 
     let header = header_format(accent_u32(accent_color));
     let mut row = 0u32;
-    ws.write_string_with_format(row, 0, "СТАТИСТИКА", &header).map_err(e2s)?;
+    ws.write_string_with_format(row, 0, "СТАТИСТИКА", &header).map_err(err)?;
     row += 1;
-    ws.write_string(row, 0, &fmt_period(date_from, date_to)).map_err(e2s)?;
+    ws.write_string(row, 0, fmt_period(date_from, date_to)).map_err(err)?;
     row += 2;
-    ws.write_string(row, 0, format!("Записей: {}", st.count)).map_err(e2s)?;
-    ws.write_string(row, 1, format!("Общее время: {}", st.total_label)).map_err(e2s)?;
-    ws.write_string(row, 2, format!("Среднее: {}", st.avg_label)).map_err(e2s)?;
+    ws.write_string(row, 0, format!("Записей: {}", st.count)).map_err(err)?;
+    ws.write_string(row, 1, format!("Общее время: {}", st.total_label)).map_err(err)?;
+    ws.write_string(row, 2, format!("Среднее: {}", st.avg_label)).map_err(err)?;
     row += 2;
 
     for (title, items) in stats_sections(st) {
         if items.is_empty() {
             continue;
         }
-        ws.write_string(row, 0, title).map_err(e2s)?;
+        ws.write_string(row, 0, title).map_err(err)?;
         row += 1;
         for (col, h) in ["Имя", "Задач", "Общее время", "Среднее"].iter().enumerate() {
-            ws.write_string_with_format(row, col as u16, *h, &header).map_err(e2s)?;
+            ws.write_string_with_format(row, col as u16, *h, &header).map_err(err)?;
         }
         row += 1;
         for item in items {
-            ws.write_string(row, 0, &item.name).map_err(e2s)?;
-            ws.write_number(row, 1, item.count as f64).map_err(e2s)?;
-            ws.write_string(row, 2, &item.total_label).map_err(e2s)?;
-            ws.write_string(row, 3, &item.avg_label).map_err(e2s)?;
+            ws.write_string(row, 0, &item.name).map_err(err)?;
+            ws.write_number(row, 1, item.count as f64).map_err(err)?;
+            ws.write_string(row, 2, &item.total_label).map_err(err)?;
+            ws.write_string(row, 3, &item.avg_label).map_err(err)?;
             row += 1;
         }
         row += 1;
     }
     for col in 0..4u16 {
-        ws.set_column_width(col, 18.0).map_err(e2s)?;
+        ws.set_column_width(col, 18.0).map_err(err)?;
     }
-    wb.save(path).map_err(e2s)
+    wb.save(path).map_err(err)
 }
 
 fn err(e: rust_xlsxwriter::XlsxError) -> String {
-    e.to_string()
-}
-
-fn e2s(e: rust_xlsxwriter::XlsxError) -> String {
     e.to_string()
 }

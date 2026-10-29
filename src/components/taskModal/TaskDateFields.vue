@@ -9,10 +9,10 @@ const end = defineModel("end", { type: String, default: "" })
   <div class="d-flex ga-4 mb-3">
     <v-text-field
       v-model="start"
+      v-maska="'##.##.#### ##:##'"
       label="Начало"
       width="50%"
       placeholder="дд.мм.гггг мм:чч"
-      v-maska="'##.##.#### ##:##'"
       :rules="[dateTimeRule]"
       density="compact"
       variant="outlined"
@@ -21,10 +21,10 @@ const end = defineModel("end", { type: String, default: "" })
     />
     <v-text-field
       v-model="end"
+      v-maska="'##.##.#### ##:##'"
       label="Завершение"
       width="50%"
       placeholder="дд.мм.гггг мм:чч"
-      v-maska="'##.##.#### ##:##'"
       :rules="[dateTimeRule]"
       density="compact"
       variant="outlined"

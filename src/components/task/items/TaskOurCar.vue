@@ -1,13 +1,13 @@
 <script setup>
-import {useAppStore} from "../../../store.js"
-import {statusHex, statusTextHex} from "../../../statusColors.js"
+import { useSettingsStore } from "../../../stores/settings.js"
+import { statusHex, statusTextHex } from "../../../statusColors.js"
 const props = defineProps({
-  task: Object
+  task: Object,
 })
 
-const store = useAppStore()
+const settingsStore = useSettingsStore()
 
-defineOptions({name:'TaskOurCar'})
+defineOptions({ name: "TaskOurCar" })
 </script>
 
 <template>
@@ -17,12 +17,13 @@ defineOptions({name:'TaskOurCar'})
     width="100%"
     min-width="60px"
     class="pa-2 our-car-cell d-flex align-center justify-center"
-    :style="{ backgroundColor: statusHex(store.settings.ourCarColor), color: statusTextHex(store.settings.ourCarColor) }"
+    :style="{
+      backgroundColor: statusHex(settingsStore.settings.ourCarColor),
+      color: statusTextHex(settingsStore.settings.ourCarColor),
+    }"
   >
     <v-icon icon="mdi-car" title="Наша машина" />
   </v-sheet>
 </template>
 
-<style lang="scss">
-
-</style>
+<style lang="scss"></style>

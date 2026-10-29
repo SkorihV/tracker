@@ -2,16 +2,16 @@
 import { ref, watch, computed } from "vue"
 import { save } from "@tauri-apps/plugin-dialog"
 import { api } from "../../api.js"
-import { useAppStore } from "../../store.js"
+import { useTasksStore } from "../../stores/tasks.js"
 import { reportFilter, today } from "../../reportFilter.js"
 import BaseModal from "../base/BaseModal.vue"
 import BasePeriodFields from "../base/BasePeriodFields.vue"
 
-const store = useAppStore()
+const tasksStore = useTasksStore()
 const emit = defineEmits(["close"])
 
-const dateFrom = ref(store.filter.dateFrom || today())
-const dateTo = ref(store.filter.dateTo || today())
+const dateFrom = ref(tasksStore.filter.dateFrom || today())
+const dateTo = ref(tasksStore.filter.dateTo || today())
 
 const format = ref("xlsx")
 
@@ -23,14 +23,14 @@ const saved = ref("")
 function tsNow() {
   const d = new Date()
   const p = (n) => String(n).padStart(2, "0")
-  return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`
 }
 
 async function loadStats() {
   loading.value = true
   error.value = ""
   try {
-    stats.value = await api.statsPreview(reportFilter(dateFrom.value, dateTo.value, store.filter))
+    stats.value = await api.statsPreview(reportFilter(dateFrom.value, dateTo.value, tasksStore.filter))
   } catch (e) {
     error.value = String(e)
     stats.value = null
@@ -49,7 +49,13 @@ async function saveStats() {
       filters: [{ name: ext.toUpperCase(), extensions: [ext] }],
     })
     if (!target) return
-    const path = await api.createStats(ext, reportFilter(dateFrom.value, dateTo.value, store.filter), dateFrom.value, dateTo.value, target)
+    const path = await api.createStats(
+      ext,
+      reportFilter(dateFrom.value, dateTo.value, tasksStore.filter),
+      dateFrom.value,
+      dateTo.value,
+      target
+    )
     saved.value = path
   } catch (e) {
     error.value = String(e)
@@ -63,6 +69,7 @@ const sections = computed(() => {
     { title: "По клиентам", items: stats.value.byClient },
     { title: "По тегам", items: stats.value.byTag },
     { title: "По месяцам", items: stats.value.byMonth },
+    { title: "Клиент / пользователь", items: stats.value.byClientUser },
   ]
 })
 
@@ -121,7 +128,13 @@ loadStats()
 
     <template #actions>
       <v-btn variant="text" @click="emit('close')">Закрыть</v-btn>
-      <v-btn color="primary" variant="flat" :disabled="loading" prepend-icon="systemIcons:iconExport" @click="saveStats">
+      <v-btn
+        color="primary"
+        variant="flat"
+        :disabled="loading"
+        prepend-icon="systemIcons:iconExport"
+        @click="saveStats"
+      >
         Экспорт ({{ format.toUpperCase() }})
       </v-btn>
     </template>

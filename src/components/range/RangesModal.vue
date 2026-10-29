@@ -48,10 +48,16 @@ function save() {
 </script>
 
 <template>
-  <BaseModal title="Временные диапазоны" width="720" height="65vh" body-class="pa-4 flex-grow-1 d-flex flex-column" @close="emit('close')">
+  <BaseModal
+    title="Временные диапазоны"
+    width="720"
+    height="65vh"
+    body-class="pa-4 flex-grow-1 d-flex flex-column"
+    @close="emit('close')"
+  >
     <div class="text-caption text-medium-emphasis mb-2">
-      По строке: «дд.мм.гггг мм:чч — дд.мм.гггг мм:чч» (или просто «дд.мм.гггг мм:чч» — открытый).
-      Завершение можно не заполнять.
+      По строке: «дд.мм.гггг мм:чч — дд.мм.гггг мм:чч» (или просто «дд.мм.гггг мм:чч» — открытый). Завершение можно не
+      заполнять.
     </div>
     <v-textarea
       v-model="localText"
@@ -64,7 +70,7 @@ function save() {
       @keydown.esc="emit('close')"
     />
     <v-sheet v-if="error" density="compact">
-      <v-alert  color="error" density="compact" class="mt-3">
+      <v-alert color="error" density="compact" class="mt-3">
         {{ error }}
       </v-alert>
     </v-sheet>

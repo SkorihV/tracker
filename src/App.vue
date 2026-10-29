@@ -1,6 +1,8 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from "vue"
-import { useAppStore } from "./store"
+import { useAppStore } from "./stores/app.js"
+import { useSettingsStore } from "./stores/settings.js"
+import { useTasksStore } from "./stores/tasks.js"
 import FilterBar from "./components/filter/FilterBar.vue"
 import TaskTable from "./components/task/TaskTable.vue"
 import TaskModal from "./components/taskModal/TaskModal.vue"
@@ -11,7 +13,9 @@ import ImportExportModal from "./components/import/ImportExportModal.vue"
 import BaseConfirmDeleteModal from "./components/base/BaseConfirmDeleteModal.vue"
 import HeaderLayout from "./components/header/HeaderLayout.vue"
 
-const store = useAppStore()
+const appStore = useAppStore()
+const settingsStore = useSettingsStore()
+const tasksStore = useTasksStore()
 const editing = ref(null)
 const showReport = ref(false)
 const showStats = ref(false)
@@ -20,7 +24,6 @@ const confirmDelete = ref(null)
 const searchRef = ref(null)
 const selectedIds = ref(new Set())
 
-
 function focusSearch() {
   searchRef.value?.focus()
   const el = searchRef.value?.$el?.querySelector?.("input")
@@ -28,13 +31,13 @@ function focusSearch() {
 }
 
 async function newTask() {
-  if (!store.settings.username) {
-    store.showSettings = true
+  if (!settingsStore.settings.username) {
+    appStore.showSettings = true
     return
   }
   editing.value = {
     mode: "new",
-    user: store.settings.username,
+    user: settingsStore.settings.username,
     orders: [],
     tags: [],
     client: "",
@@ -66,23 +69,24 @@ async function onSaveTask(draft) {
   const fields = {
     user: draft.user,
     orders: draft.orders || [],
-    tags: draft.tags || [],    client: draft.client,
+    tags: draft.tags || [],
+    client: draft.client,
     comment: draft.comment,
     customStatus: draft.customStatus || "",
     ourCar: draft.ourCar || false,
   }
   let id = draft.taskId
   if (draft.mode === "new") {
-    const created = await store.addTask(fields)
+    const created = await tasksStore.addTask(fields)
     id = created.taskId
   } else {
-    await store.updateTask(id, fields)
+    await tasksStore.updateTask(id, fields)
   }
   if (draft._datesDirty) {
-    await store.updateTaskDates(id, draft.start || "", draft.end || "")
+    await tasksStore.updateTaskDates(id, draft.start || "", draft.end || "")
   }
   if (draft._rangesDirty && draft._rangesLines?.length) {
-    await store.updateTaskIntervals(id, draft._rangesLines)
+    await tasksStore.updateTaskIntervals(id, draft._rangesLines)
   }
   editing.value = null
 }
@@ -95,17 +99,16 @@ async function onDeleteTasks(ids) {
 async function onConfirmDelete() {
   const ids = confirmDelete.value
   confirmDelete.value = null
-  if (ids?.length) await store.removeTasks(ids)
+  if (ids?.length) await tasksStore.removeTasks(ids)
 }
-
 
 function onKeydown(e) {
   const tag = (e.target.tagName || "").toLowerCase()
   const typing = tag === "input" || tag === "textarea" || tag === "select"
   if (typing) {
     if (e.key === "Escape" && tag === "input" && e.target === searchRef.value?.$el?.querySelector?.("input")) {
-      store.filter.search = ""
-      store.refreshQuery()
+      tasksStore.filter.search = ""
+      appStore.refreshQuery()
     }
     return
   }
@@ -121,13 +124,13 @@ function onKeydown(e) {
   }
 }
 
+// Таблицу нужно обновлять раз в секунду, только пока где-то идёт таймер.
 let timer = null
 onMounted(async () => {
   window.addEventListener("keydown", onKeydown)
-  await store.init()
-  await store.refreshQuery()
-  timer = window.setInterval(async () => {
-    await store.refreshQuery()
+  await appStore.init()
+  timer = window.setInterval(() => {
+    if (tasksStore.hasRunning) appStore.refreshQuery()
   }, 1000)
 })
 
@@ -139,34 +142,41 @@ onBeforeUnmount(() => {
 
 <template>
   <v-app>
-     <header-layout
-      @new-task="newTask"
-     />
+    <header-layout @new-task="newTask" />
 
     <v-main class="pa-4 d-flex flex-column">
-      <v-alert v-if="store.error" max-height="100px" type="error" density="compact" class="mb-3" closable @click:close="store.error = ''">
-        {{ store.error }}
+      <v-alert
+        v-if="appStore.error"
+        max-height="100px"
+        type="error"
+        density="compact"
+        class="mb-3"
+        closable
+        @click:close="appStore.error = ''"
+      >
+        {{ appStore.error }}
       </v-alert>
       <FilterBar />
 
-      <TaskTable
-        class="flex-grow-1"
-        v-model:selected-ids="selectedIds"
-        @edit="editTask"
-        @delete="onDeleteTasks"
-      />
+      <TaskTable v-model:selected-ids="selectedIds" class="flex-grow-1" @edit="editTask" @delete="onDeleteTasks" />
 
       <div class="d-flex align-center justify-space-between flex-wrap ga-4 pt-3">
         <div class="d-flex align-center ga-3">
           <span class="text-body-2 text-medium-emphasis">
-            Задачи: <b>{{ store.totals.count }}</b>
+            Задачи: <b>{{ tasksStore.totals.count }}</b>
           </span>
           <span class="text-body-2 text-medium-emphasis">
-            Общее время: <b class="mono">{{ store.totals.timeLabel }}</b>
+            Общее время: <b class="mono">{{ tasksStore.totals.timeLabel }}</b>
           </span>
-          <v-btn variant="tonal" size="small" prepend-icon="systemIcons:iconClock" @click="showReport = true">Отчёт</v-btn>
-          <v-btn variant="tonal" size="small" prepend-icon="systemIcons:iconChart" @click="showStats = true">Статистика</v-btn>
-          <v-btn variant="tonal" size="small" prepend-icon="systemIcons:iconExport" @click="showImportExport = true">Экспорт/Импорт</v-btn>
+          <v-btn variant="tonal" size="small" prepend-icon="systemIcons:iconClock" @click="showReport = true"
+            >Отчёт</v-btn
+          >
+          <v-btn variant="tonal" size="small" prepend-icon="systemIcons:iconChart" @click="showStats = true"
+            >Статистика</v-btn
+          >
+          <v-btn variant="tonal" size="small" prepend-icon="systemIcons:iconExport" @click="showImportExport = true"
+            >Экспорт/Импорт</v-btn
+          >
         </div>
         <v-btn
           v-if="selectedIds.size"
@@ -181,7 +191,7 @@ onBeforeUnmount(() => {
     </v-main>
 
     <TaskModal v-if="editing" :draft="editing" @save="onSaveTask" @close="editing = null" />
-    <SettingsModal v-if="store.showSettings" @close="store.showSettings = false" />
+    <SettingsModal v-if="appStore.showSettings" @close="appStore.showSettings = false" />
     <ReportModal v-if="showReport" @close="showReport = false" />
     <StatsModal v-if="showStats" @close="showStats = false" />
     <ImportExportModal v-if="showImportExport" @close="showImportExport = false" />

@@ -9,6 +9,16 @@ use crate::dt::{now_naive, parse_dt};
 use crate::logic::{build_rows, build_totals, apply_filter, TaskFilter, TaskIdGen, Totals, ViewRow};
 use crate::models::{AppState, AppTask, ColumnPref, Entity, Interval, Settings, StatusDef, Task, TaskDraft, TaskStatus};
 
+/// Действие таймера над задачей.
+#[derive(Clone, Copy, Debug, serde::Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum TaskAction {
+    Start,
+    Pause,
+    Resume,
+    Complete,
+}
+
 #[derive(Debug)]
 pub struct Store {
     pub path: PathBuf,
@@ -131,8 +141,12 @@ impl Store {
         }
     }
 
-    pub fn save(&self) {
-        let _ = fs::create_dir_all(self.path.parent().unwrap_or(&self.path));
+    /// Атомарная запись: во временный файл в том же каталоге, затем rename.
+    /// Любая ошибка возвращается вызывающему (и доходит до интерфейса).
+    pub fn save(&self) -> Result<(), String> {
+        let dir = self.path.parent().unwrap_or(&self.path);
+        fs::create_dir_all(dir)
+            .map_err(|e| format!("Не удалось создать каталог данных «{}»: {e}", dir.display()))?;
         let now = now_naive();
         let obj = serde_json::json!({
             "settings": self.settings.to_json(),
@@ -145,17 +159,32 @@ impl Store {
             "_next_client_id": self.next_client_id,
             "_next_status_id": self.next_status_id,
         });
-        if let Ok(pretty) = serde_json::to_string_pretty(&obj) {
-            // Атомарная запись: во временный файл в том же каталоге, затем rename.
-            let tmp = self.path.with_extension("json.tmp");
-            if let Ok(mut f) = fs::File::create(&tmp) {
-                if f.write_all(pretty.as_bytes()).is_ok() {
-                    let _ = f.sync_all();
-                    drop(f);
-                    let _ = fs::rename(&tmp, &self.path);
-                }
-            }
-        }
+        let pretty = serde_json::to_string_pretty(&obj)
+            .map_err(|e| format!("Не удалось сериализовать данные: {e}"))?;
+        let tmp = self.path.with_extension("json.tmp");
+        let write = || -> std::io::Result<()> {
+            let mut f = fs::File::create(&tmp)?;
+            f.write_all(pretty.as_bytes())?;
+            f.sync_all()?;
+            drop(f);
+            fs::rename(&tmp, &self.path)
+        };
+        write().map_err(|e| {
+            let _ = fs::remove_file(&tmp);
+            format!("Не удалось сохранить данные в «{}»: {e}", self.path.display())
+        })
+    }
+
+    /// Идущие задачи и сколько секунд длится их текущий (открытый) диапазон.
+    pub fn running_elapsed(&self, now: chrono::NaiveDateTime) -> Vec<(&Task, i64)> {
+        self.tasks
+            .iter()
+            .filter(|t| t.status == TaskStatus::Running)
+            .filter_map(|t| {
+                let open = t.intervals.iter().rev().find(|i| i.stop.is_none())?;
+                Some((t, (now - open.start).num_seconds().max(0)))
+            })
+            .collect()
     }
 
     // -----------------------------------------------------------------
@@ -163,14 +192,12 @@ impl Store {
     // -----------------------------------------------------------------
 
     pub fn state(&self) -> AppState {
-        let now = now_naive();
         AppState {
             settings: self.settings.clone(),
             users: self.users.clone(),
             tags: self.tags.clone(),
             clients: self.clients.clone(),
             statuses: self.statuses.clone(),
-            tasks: self.tasks.iter().map(|t| AppTask::from_task(t, now)).collect(),
         }
     }
 
@@ -186,7 +213,7 @@ impl Store {
     // Задачи
     // -----------------------------------------------------------------
 
-    pub fn create_task(&mut self, draft: TaskDraft) -> AppTask {
+    pub fn create_task(&mut self, draft: TaskDraft) -> Result<AppTask, String> {
         let now = now_naive();
         let mut task = Task {
             task_id: self.id_gen.next_id(),
@@ -212,11 +239,11 @@ impl Store {
         self.ensure_status(&task.custom_status);
         let view = AppTask::from_task(&task, now_naive());
         self.tasks.push(task);
-        self.save();
-        view
+        self.save()?;
+        Ok(view)
     }
 
-    pub fn update_task(&mut self, task_id: &str, draft: TaskDraft) {
+    pub fn update_task(&mut self, task_id: &str, draft: TaskDraft) -> Result<(), String> {
         if let Some(t) = self.tasks.iter_mut().find(|t| t.task_id == task_id) {
             draft.apply(t);
         }
@@ -228,29 +255,29 @@ impl Store {
             }
         }
         self.ensure_client(&draft.client);
-        self.ensure_status(&draft.custom_status.trim());
-        self.save();
+        self.ensure_status(&draft.custom_status);
+        self.save()
     }
 
     /// Сменить пользовательский статус задачи (каскадно в справочник, если
     /// статус ещё не существует).
-    pub fn set_task_status(&mut self, task_id: &str, status: String) {
+    pub fn set_task_status(&mut self, task_id: &str, status: String) -> Result<(), String> {
         let status = status.trim().to_string();
         self.ensure_status(&status);
         if let Some(t) = self.tasks.iter_mut().find(|t| t.task_id == task_id) {
             t.custom_status = status;
         }
-        self.save();
+        self.save()
     }
 
     /// Обновить даты ПОСЛЕДНЕГО диапазона (поля «Начало/Завершение» редактора).
     pub fn set_task_dates(&mut self, task_id: &str, start: String, end: String) -> Result<(), String> {
         let start_dt = parse_dt(&start)
-            .ok_or_else(|| format!("Неверный формат начала (дд.мм.гггг чч:мм)"))?;
+            .ok_or_else(|| "Неверный формат начала (дд.мм.гггг чч:мм)".to_string())?;
         let end_dt = if end.trim().is_empty() {
             None
         } else {
-            Some(parse_dt(&end).ok_or_else(|| format!("Неверный формат завершения (дд.мм.гггг чч:мм)"))?)
+            Some(parse_dt(&end).ok_or_else(|| "Неверный формат завершения (дд.мм.гггг чч:мм)".to_string())?)
         };
         if let Some(e) = end_dt {
             if e < start_dt {
@@ -260,8 +287,7 @@ impl Store {
         if let Some(t) = self.tasks.iter_mut().find(|t| t.task_id == task_id) {
             t.set_last_interval(start_dt, end_dt);
         }
-        self.save();
-        Ok(())
+        self.save()
     }
 
     /// Заменить все диапазоны задачи строками «дд.мм.гггг чч:мм — …»
@@ -301,8 +327,7 @@ impl Store {
                 t.status.clone()
             };
         }
-        self.save();
-        Ok(())
+        self.save()
     }
 
     /// Строка «дд.мм.гггг чч:мм [»— …»]»; завершение может отсутствовать,
@@ -332,320 +357,47 @@ impl Store {
         Ok(Interval { start, stop })
     }
 
-    pub fn start_task(&mut self, task_id: &str) {
+    /// Применить действие таймера к задаче и сохранить файл.
+    pub fn task_action(&mut self, task_id: &str, action: TaskAction) -> Result<(), String> {
+        let now = now_naive();
         if let Some(t) = self.tasks.iter_mut().find(|t| t.task_id == task_id) {
-            if t.status != crate::models::TaskStatus::Running {
-                t.start(now_naive());
-            }
-        }
-        self.save();
-    }
-
-    pub fn pause_task(&mut self, task_id: &str) {
-        if let Some(t) = self.tasks.iter_mut().find(|t| t.task_id == task_id) {
-            t.pause(now_naive());
-        }
-        self.save();
-    }
-
-    pub fn resume_task(&mut self, task_id: &str) {
-        if let Some(t) = self.tasks.iter_mut().find(|t| t.task_id == task_id) {
-            if t.status != crate::models::TaskStatus::Running {
-                t.start(now_naive());
-            }
-        }
-        self.save();
-    }
-
-    pub fn complete_task(&mut self, task_id: &str) {
-        if let Some(t) = self.tasks.iter_mut().find(|t| t.task_id == task_id) {
-            t.complete(now_naive());
-        }
-        self.save();
-    }
-
-    pub fn remove_task(&mut self, task_id: &str) {
-        self.tasks.retain(|t| t.task_id != task_id);
-        self.save();
-    }
-
-    // -----------------------------------------------------------------
-    // Пользователи
-    // -----------------------------------------------------------------
-
-    fn ensure_user(&mut self, name: &str) {
-        let name = name.trim();
-        if !name.is_empty() && !self.users.iter().any(|u| u == name) {
-            self.users.push(name.to_string());
-        }
-    }
-
-    pub fn add_user(&mut self, name: &str) {
-        let name = name.trim();
-        if !name.is_empty() && !self.users.iter().any(|u| u == name) {
-            self.users.push(name.to_string());
-            self.save();
-        }
-    }
-
-    pub fn remove_user(&mut self, name: &str) {
-        self.users.retain(|u| u != name);
-        if self.settings.username == name {
-            self.settings.username.clear();
-        }
-        self.save();
-    }
-
-    /// Удалить всех пользователей справочника.
-    pub fn clear_users(&mut self) {
-        self.users.clear();
-        self.settings.username.clear();
-        self.save();
-    }
-
-    pub fn rename_user(&mut self, old: &str, new: &str) {
-        let new = new.trim();
-        if new.is_empty() {
-            return;
-        }
-        for u in self.users.iter_mut() {
-            if u == old {
-                *u = new.to_string();
-            }
-        }
-        if self.settings.username == old {
-            self.settings.username = new.to_string();
-        }
-        for t in self.tasks.iter_mut() {
-            if t.user == old {
-                t.user = new.to_string();
-            }
-        }
-        self.save();
-    }
-
-    pub fn move_user(&mut self, from: usize, to: usize) {
-        if shift_vec(&mut self.users, from, to) {
-            self.save();
-        }
-    }
-
-    // -----------------------------------------------------------------
-    // Теги / клиенты
-    // -----------------------------------------------------------------
-
-    fn ensure_tag(&mut self, name: &str) {
-        let name = name.trim();
-        if name.is_empty() || self.tags.iter().any(|e| e.name == name) {
-            return;
-        }
-        self.tags.push(Entity {
-            id: self.next_tag_id,
-            name: name.to_string(),
-        });
-        self.next_tag_id += 1;
-        self.save();
-    }
-
-    /// Добавить клиента в справочник, если его там ещё нет.
-    fn ensure_client(&mut self, name: &str) {
-        let name = name.trim();
-        if name.is_empty() || self.clients.iter().any(|e| e.name == name) {
-            return;
-        }
-        self.clients.push(Entity {
-            id: self.next_client_id,
-            name: name.to_string(),
-        });
-        self.next_client_id += 1;
-        self.save();
-    }
-
-    pub fn add_tag(&mut self, name: &str) {
-        let name = name.trim();
-        if name.is_empty() || self.tags.iter().any(|e| e.name == name) {
-            return;
-        }
-        self.tags.push(Entity {
-            id: self.next_tag_id,
-            name: name.to_string(),
-        });
-        self.next_tag_id += 1;
-        self.save();
-    }
-
-    pub fn rename_tag(&mut self, old: &str, new: &str) {
-        let new = new.trim();
-        if new.is_empty() {
-            return;
-        }
-        if let Some(tag) = self.tags.iter_mut().find(|e| e.name == old) {
-            tag.name = new.to_string();
-        }
-        for t in self.tasks.iter_mut() {
-            for tag in t.tags.iter_mut() {
-                if tag == old {
-                    *tag = new.to_string();
+            match action {
+                TaskAction::Start | TaskAction::Resume => {
+                    if t.status != TaskStatus::Running {
+                        t.start(now);
+                    }
                 }
+                TaskAction::Pause => t.pause(now),
+                TaskAction::Complete => t.complete(now),
             }
         }
-        self.save();
+        self.save()
     }
 
-    pub fn remove_tag(&mut self, id: u64) {
-        self.tags.retain(|e| e.id != id);
-        self.save();
+    pub fn start_task(&mut self, task_id: &str) -> Result<(), String> {
+        self.task_action(task_id, TaskAction::Start)
     }
 
-    /// Удалить все теги справочника.
-    pub fn clear_tags(&mut self) {
-        self.tags.clear();
-        self.save();
+    pub fn pause_task(&mut self, task_id: &str) -> Result<(), String> {
+        self.task_action(task_id, TaskAction::Pause)
     }
 
-    pub fn move_tag(&mut self, from: usize, to: usize) {
-        if shift_vec(&mut self.tags, from, to) {
-            self.save();
-        }
+    pub fn resume_task(&mut self, task_id: &str) -> Result<(), String> {
+        self.task_action(task_id, TaskAction::Resume)
     }
 
-    // -----------------------------------------------------------------
-    // Статусы задачи (справочник «Статус»)
-    // -----------------------------------------------------------------
-
-    /// Добавить статус в справочник, если ещё нет; сохраняет файл.
-    pub fn ensure_status(&mut self, name: &str) {
-        let name = name.trim();
-        if name.is_empty() || self.statuses.iter().any(|s| s.name == name) {
-            return;
-        }
-        self.statuses.push(StatusDef {
-            id: self.next_status_id,
-            name: name.to_string(),
-            color: "default".to_string(),
-        });
-        self.next_status_id += 1;
-        self.save();
+    pub fn complete_task(&mut self, task_id: &str) -> Result<(), String> {
+        self.task_action(task_id, TaskAction::Complete)
     }
 
-    pub fn add_status(&mut self, name: &str, color: &str) {
-        let name = name.trim();
-        if name.is_empty() || self.statuses.iter().any(|s| s.name == name) {
-            return;
-        }
-        self.statuses.push(StatusDef {
-            id: self.next_status_id,
-            name: name.to_string(),
-            color: color.trim().to_string(),
-        });
-        self.next_status_id += 1;
-        self.save();
+    pub fn remove_task(&mut self, task_id: &str) -> Result<(), String> {
+        self.remove_tasks(&[task_id.to_string()])
     }
 
-    pub fn remove_status(&mut self, id: u64) {
-        let removed_names: Vec<String> = self
-            .statuses
-            .iter()
-            .filter(|s| s.id == id)
-            .map(|s| s.name.clone())
-            .collect();
-        self.statuses.retain(|s| s.id != id);
-        if !removed_names.is_empty() {
-            for t in self.tasks.iter_mut() {
-                if removed_names.contains(&t.custom_status) {
-                    t.custom_status.clear();
-                }
-            }
-        }
-        self.save();
-    }
-
-    /// Удалить все статусы справочника (у задач статус сбрасывается).
-    pub fn clear_statuses(&mut self) {
-        self.statuses.clear();
-        for t in self.tasks.iter_mut() {
-            t.custom_status.clear();
-        }
-        self.save();
-    }
-
-    pub fn move_status(&mut self, from: usize, to: usize) {
-        if shift_vec(&mut self.statuses, from, to) {
-            self.save();
-        }
-    }
-
-    pub fn rename_status(&mut self, old: &str, new: &str) {
-        let new = new.trim();
-        if new.is_empty() {
-            return;
-        }
-        if let Some(st) = self.statuses.iter_mut().find(|s| s.name == old) {
-            st.name = new.to_string();
-        }
-        for t in self.tasks.iter_mut() {
-            if t.custom_status == old {
-                t.custom_status = new.to_string();
-            }
-        }
-        self.save();
-    }
-
-    pub fn set_status_color(&mut self, id: u64, color: String) {
-        if let Some(st) = self.statuses.iter_mut().find(|s| s.id == id) {
-            st.color = color.trim().to_string();
-            self.save();
-        }
-    }
-
-    // -----------------------------------------------------------------
-    // Клиенты
-    // -----------------------------------------------------------------
-
-    pub fn add_client(&mut self, name: &str) {
-        let name = name.trim();
-        if name.is_empty() || self.clients.iter().any(|e| e.name == name) {
-            return;
-        }
-        self.clients.push(Entity {
-            id: self.next_client_id,
-            name: name.to_string(),
-        });
-        self.next_client_id += 1;
-        self.save();
-    }
-
-    pub fn rename_client(&mut self, old: &str, new: &str) {
-        let new = new.trim();
-        if new.is_empty() {
-            return;
-        }
-        if let Some(c) = self.clients.iter_mut().find(|e| e.name == old) {
-            c.name = new.to_string();
-        }
-        for t in self.tasks.iter_mut() {
-            if t.client == old {
-                t.client = new.to_string();
-            }
-        }
-        self.save();
-    }
-
-    pub fn remove_client(&mut self, id: u64) {
-        self.clients.retain(|e| e.id != id);
-        self.save();
-    }
-
-    /// Удалить всех клиентов справочника.
-    pub fn clear_clients(&mut self) {
-        self.clients.clear();
-        self.save();
-    }
-
-    pub fn move_client(&mut self, from: usize, to: usize) {
-        if shift_vec(&mut self.clients, from, to) {
-            self.save();
-        }
+    /// Удалить несколько задач одним сохранением файла.
+    pub fn remove_tasks(&mut self, ids: &[String]) -> Result<(), String> {
+        self.tasks.retain(|t| !ids.contains(&t.task_id));
+        self.save()
     }
 
 // -----------------------------------------------------------------
@@ -758,7 +510,7 @@ pub fn import_json_file(
             for td in arr {
                 let name = td.get("name").and_then(|x| x.as_str()).unwrap_or("");
                 if !name.is_empty() && !st.tags.iter().any(|t| t.name == name) {
-                    st.add_tag(name);
+                    st.add_tag(name)?;
                 }
             }
         }
@@ -769,7 +521,7 @@ pub fn import_json_file(
             for cd in arr {
                 let name = cd.get("name").and_then(|x| x.as_str()).unwrap_or("");
                 if !name.is_empty() && !st.clients.iter().any(|c| c.name == name) {
-                    st.add_client(name);
+                    st.add_client(name)?;
                 }
             }
         }
@@ -780,7 +532,7 @@ pub fn import_json_file(
             for u in arr {
                 if let Some(name) = u.as_str() {
                     if !name.trim().is_empty() {
-                        st.add_user(name);
+                        st.add_user(name)?;
                     }
                 }
             }
@@ -791,7 +543,7 @@ pub fn import_json_file(
         if let Some(arr) = data.get("statuses").and_then(|x| x.as_array()) {
             for sd in arr {
                 if let Some(s) = StatusDef::from_json(sd) {
-                    st.add_status(&s.name, &s.color);
+                    st.add_status(&s.name, &s.color)?;
                 }
             }
         }
@@ -852,15 +604,13 @@ pub fn import_json_file(
         }
     }
 
-    st.save();
-    Ok(())
+    st.save()
 }
-
 // -----------------------------------------------------------------
 // Настройки
 // -----------------------------------------------------------------
 
-    pub fn set_settings(&mut self, username: String, grouping: String, accent_color: String) {
+    pub fn set_settings(&mut self, username: String, grouping: String, accent_color: String) -> Result<(), String> {
         self.settings.username = username.trim().to_string();
         if ["none", "day", "client"].contains(&grouping.as_str()) {
             self.settings.grouping = grouping;
@@ -873,31 +623,39 @@ pub fn import_json_file(
         if !name.is_empty() {
             self.ensure_user(&name);
         }
-        self.save();
+        self.save()
     }
 
     /// Сохранить цвет ячейки «Наша машина».
-    pub fn set_our_car_color(&mut self, color: String) {
+    pub fn set_our_car_color(&mut self, color: String) -> Result<(), String> {
         let color = color.trim().to_string();
         if let Some(hex) = normalize_hex(&color) {
             self.settings.our_car_color = hex;
         }
-        self.save();
+        self.save()
     }
 
     /// Сохранить порядок и видимость колонок таблицы.
-    pub fn set_columns(&mut self, columns: Vec<ColumnPref>) {
+    pub fn set_columns(&mut self, columns: Vec<ColumnPref>) -> Result<(), String> {
         self.settings.columns = columns;
-        self.save();
+        self.save()
+    }
+
+    /// Параметры трея и напоминаний.
+    pub fn set_tray_prefs(&mut self, minimize_to_tray: bool, reminder_hours: u32) -> Result<(), String> {
+        self.settings.minimize_to_tray = minimize_to_tray;
+        self.settings.reminder_hours = reminder_hours.min(crate::models::MAX_REMINDER_HOURS);
+        self.save()
     }
 
     /// Сохранить пользовательский каталог бэкапов ("" = по умолчанию).
-    pub fn set_backups_dir(&mut self, dir: String) {
+    pub fn set_backups_dir(&mut self, dir: String) -> Result<(), String> {
         let dir = dir.trim().to_string();
-        if dir.chars().count() <= 512 {
-            self.settings.backup_dir = dir;
-            self.save();
+        if dir.chars().count() > 512 {
+            return Err("Путь к каталогу бэкапов слишком длинный (макс. 512 символов)".to_string());
         }
+        self.settings.backup_dir = dir;
+        self.save()
     }
 }
 
@@ -917,7 +675,7 @@ fn normalize_hex(s: &str) -> Option<String> {
 }
 
 /// Переместить элемент с индексом `from` на индекс `to`; `false`, если границы неверны.
-fn shift_vec<T>(v: &mut Vec<T>, from: usize, to: usize) -> bool {
+pub(crate) fn shift_vec<T>(v: &mut Vec<T>, from: usize, to: usize) -> bool {
     if from >= v.len() || to >= v.len() || from == to {
         return false;
     }

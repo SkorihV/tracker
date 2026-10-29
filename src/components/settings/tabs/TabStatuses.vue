@@ -2,9 +2,9 @@
 import { ref, reactive, nextTick } from "vue"
 import { statusHex } from "../../../statusColors.js"
 import BaseConfirmDialog from "../../base/BaseConfirmDialog.vue"
-import { useAppStore } from "../../../store.js"
+import { useSettingsStore } from "../../../stores/settings.js"
 
-const store = useAppStore()
+const settingsStore = useSettingsStore()
 
 const emit = defineEmits(["action"])
 const props = defineProps({
@@ -112,6 +112,11 @@ function move(index, step) {
   if (to < 0 || to >= props.items.length) return
   emit("action", { action: "move", from: index, to })
 }
+
+function openNewPicker() {
+  picker.new = "#00000"
+  newMenu.value = true
+}
 </script>
 
 <template>
@@ -121,69 +126,82 @@ function move(index, step) {
         Статус не задан. Добавьте первый (например «Новая», «В работе», «Завершена»).
       </v-list-item>
       <v-list-item v-for="(item, i) in items" :key="item.id" class="px-2">
-          <div class="d-flex align-center ga-2">
-            <v-menu v-model="menus[item.id]" :close-on-content-click="false" location="bottom start">
-              <template #activator="{ props: menuProps }">
-                <v-btn
-                    v-bind="menuProps"
-                    icon
-                    border
-                    size="small"
-                    variant="flat"
-                    :aria-label="nameOf(item)"
-                    :style="swatchStyle(colorOf(item))"
-                    @click="openColorMenu(item)"
-                />
-              </template>
-              <v-sheet class="pa-2 d-flex flex-column ga-2">
-                <v-color-picker
-                    v-model="picker[item.id]"
-                    mode="hex"
-                    hide-inputs
-                    :width="280"
-                />
-                <v-btn color="primary" variant="flat" density="compact" @click="applyColor(item)">
-                  Применить
-                </v-btn>
-              </v-sheet>
-            </v-menu>
-
-            <v-text-field
-                v-if="editingKey === item.id"
-                :ref="(el) => { if (el) editInputs[item.id] = el; }"
-                v-model="editName"
-                density="compact"
-                variant="outlined"
-                hide-details
-                class="flex-grow-1"
-                @keydown.enter="saveEdit(item)"
-                @keydown.esc.stop="cancelEdit"
-                @blur="cancelEdit"
+        <div class="d-flex align-center ga-2">
+          <v-menu v-model="menus[item.id]" :close-on-content-click="false" location="bottom start">
+            <template #activator="{ props: menuProps }">
+              <v-btn
+                v-bind="menuProps"
+                icon
+                border
+                size="small"
+                variant="flat"
+                :aria-label="nameOf(item)"
+                :style="swatchStyle(colorOf(item))"
+                @click="openColorMenu(item)"
               />
-            <span v-else class="flex-grow-1 text-truncate px-2">{{ nameOf(item) }}</span>
-            <template v-if="editingKey === item.id">
-              <v-btn icon aria-label="Сохранить" :variant="editDirty(item) ? 'flat' : 'text'" size="small" :disabled="!editDirty(item)" :color="editDirty(item) ? store.settings.accentColor : undefined" @mousedown.prevent @click="saveEdit(item)">
-                <v-icon icon="systemIcons:iconCheck" />
-              </v-btn>
-              <v-btn icon aria-label="Отмена" variant="text" size="small" @mousedown.prevent @click="cancelEdit">
-                <v-icon icon="systemIcons:iconClose" />
-              </v-btn>
             </template>
-            <template v-else>
-              <v-btn icon aria-label="Вверх" variant="text" size="small" :disabled="i === 0" @click="move(i, -1)">
-                <v-icon>mdi-chevron-up</v-icon>
-              </v-btn>
-              <v-btn icon aria-label="Вниз" variant="text" size="small" :disabled="i === items.length - 1" @click="move(i, 1)">
-                <v-icon>mdi-chevron-down</v-icon>
-              </v-btn>
-              <v-btn icon aria-label="Редактировать" variant="text" size="small" @click="startEdit(item)">
-                <v-icon icon="systemIcons:iconEdit" />
-              </v-btn>
-              <v-btn icon aria-label="Удалить" variant="text" size="small" color="error" @click="remove(item)">
-                <v-icon icon="systemIcons:iconTrash" />
-              </v-btn>
-            </template>
-          </div>
+            <v-sheet class="pa-2 d-flex flex-column ga-2">
+              <v-color-picker v-model="picker[item.id]" mode="hex" hide-inputs :width="280" />
+              <v-btn color="primary" variant="flat" density="compact" @click="applyColor(item)"> Применить </v-btn>
+            </v-sheet>
+          </v-menu>
+
+          <v-text-field
+            v-if="editingKey === item.id"
+            :ref="
+              (el) => {
+                if (el) editInputs[item.id] = el
+              }
+            "
+            v-model="editName"
+            density="compact"
+            variant="outlined"
+            hide-details
+            class="flex-grow-1"
+            @keydown.enter="saveEdit(item)"
+            @keydown.esc.stop="cancelEdit"
+            @blur="cancelEdit"
+          />
+          <span v-else class="flex-grow-1 text-truncate px-2">{{ nameOf(item) }}</span>
+          <template v-if="editingKey === item.id">
+            <v-btn
+              icon
+              aria-label="Сохранить"
+              :variant="editDirty(item) ? 'flat' : 'text'"
+              size="small"
+              :disabled="!editDirty(item)"
+              :color="editDirty(item) ? settingsStore.settings.accentColor : undefined"
+              @mousedown.prevent
+              @click="saveEdit(item)"
+            >
+              <v-icon icon="systemIcons:iconCheck" />
+            </v-btn>
+            <v-btn icon aria-label="Отмена" variant="text" size="small" @mousedown.prevent @click="cancelEdit">
+              <v-icon icon="systemIcons:iconClose" />
+            </v-btn>
+          </template>
+          <template v-else>
+            <v-btn icon aria-label="Вверх" variant="text" size="small" :disabled="i === 0" @click="move(i, -1)">
+              <v-icon>mdi-chevron-up</v-icon>
+            </v-btn>
+            <v-btn
+              icon
+              aria-label="Вниз"
+              variant="text"
+              size="small"
+              :disabled="i === items.length - 1"
+              @click="move(i, 1)"
+            >
+              <v-icon>mdi-chevron-down</v-icon>
+            </v-btn>
+            <v-btn icon aria-label="Редактировать" variant="text" size="small" @click="startEdit(item)">
+              <v-icon icon="systemIcons:iconEdit" />
+            </v-btn>
+            <v-btn icon aria-label="Удалить" variant="text" size="small" color="error" @click="remove(item)">
+              <v-icon icon="systemIcons:iconTrash" />
+            </v-btn>
+          </template>
+        </div>
       </v-list-item>
     </v-list>
 
@@ -205,26 +223,17 @@ function move(index, step) {
             border
             size="small"
             icon="systemIcons:iconColor"
-              :style="swatchStyle(newColor)"
-            @click="picker.new = '#00000'; newMenu = true"
+            :style="swatchStyle(newColor)"
+            @click="openNewPicker"
           />
         </template>
         <v-sheet class="pa-2 d-flex flex-column ga-2">
-          <v-color-picker
-            v-model="picker.new"
-            mode="hex"
-            hide-inputs
-            :width="280"
-          />
-          <v-btn color="primary" variant="flat" density="compact" @click="applyNewColor">
-            ОК
-          </v-btn>
+          <v-color-picker v-model="picker.new" mode="hex" hide-inputs :width="280" />
+          <v-btn color="primary" variant="flat" density="compact" @click="applyNewColor"> ОК </v-btn>
         </v-sheet>
       </v-menu>
       <v-btn variant="tonal" @click="add">Добавить</v-btn>
-      <v-btn variant="tonal" color="error" :disabled="!items.length" @click="clearAll">
-        Удалить все
-      </v-btn>
+      <v-btn variant="tonal" color="error" :disabled="!items.length" @click="clearAll"> Удалить все </v-btn>
     </div>
 
     <BaseConfirmDialog

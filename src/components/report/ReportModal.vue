@@ -2,12 +2,14 @@
 import { ref, computed, watch } from "vue"
 import { save } from "@tauri-apps/plugin-dialog"
 import { api } from "../../api.js"
-import { useAppStore } from "../../store.js"
-import {reportFilter, today} from "../../reportFilter.js"
+import { useColumnsStore } from "../../stores/columns.js"
+import { useTasksStore } from "../../stores/tasks.js"
+import { reportFilter, today } from "../../reportFilter.js"
 import BaseModal from "../base/BaseModal.vue"
 import BasePeriodFields from "../base/BasePeriodFields.vue"
 
-const store = useAppStore()
+const columnsStore = useColumnsStore()
+const tasksStore = useTasksStore()
 const emit = defineEmits(["close"])
 
 // Колонки предпросмотра — как в таблице Задач (без служебной «Действия»).
@@ -27,14 +29,14 @@ const PREVIEW_COLUMNS = {
 }
 
 const previewColumns = computed(() =>
-  store.visibleColumns
+  columnsStore.visibleColumns
     .filter((c) => c.key !== "actions" && PREVIEW_COLUMNS[c.key])
     .map((c) => PREVIEW_COLUMNS[c.key])
 )
 
 const format = ref("xlsx")
-const dateFrom = ref(store.filter.dateFrom || today())
-const dateTo = ref(store.filter.dateTo || today())
+const dateFrom = ref(tasksStore.filter.dateFrom || today())
+const dateTo = ref(tasksStore.filter.dateTo || today())
 
 const preview = ref(null)
 const loading = ref(false)
@@ -44,14 +46,14 @@ const saved = ref("")
 function tsNow() {
   const d = new Date()
   const p = (n) => String(n).padStart(2, "0")
-  return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`
 }
 
 async function loadPreview() {
   loading.value = true
   error.value = ""
   try {
-    preview.value = await api.reportPreview(reportFilter(dateFrom.value, dateTo.value, store.filter))
+    preview.value = await api.reportPreview(reportFilter(dateFrom.value, dateTo.value, tasksStore.filter))
   } catch (e) {
     error.value = String(e)
     preview.value = null
@@ -70,20 +72,31 @@ async function saveReport() {
       filters: [{ name: ext.toUpperCase(), extensions: [ext] }],
     })
     if (!target) return
-    const path = await api.createReport(ext, reportFilter(dateFrom.value, dateTo.value, store.filter), dateFrom.value, dateTo.value, target)
+    const path = await api.createReport(
+      ext,
+      reportFilter(dateFrom.value, dateTo.value, tasksStore.filter),
+      dateFrom.value,
+      dateTo.value,
+      target
+    )
     saved.value = path
   } catch (e) {
     error.value = String(e)
   }
 }
 
-watch([dateFrom, dateTo, () => store.filter.search], () => loadPreview())
+watch([dateFrom, dateTo, () => tasksStore.filter.search], () => loadPreview())
 loadPreview()
 </script>
 
 <template>
   <BaseModal title="Отчёт" max-width="1000" width="1000" max-height="85vh" @close="emit('close')">
-    <BasePeriodFields v-model:date-from="dateFrom" v-model:date-to="dateTo" v-model:format="format" empty-hint="пусто = без ограничения" />
+    <BasePeriodFields
+      v-model:date-from="dateFrom"
+      v-model:date-to="dateTo"
+      v-model:format="format"
+      empty-hint="пусто = без ограничения"
+    />
 
     <v-alert v-if="error" type="error" density="compact" variant="tonal" class="mb-3">
       {{ error }}
@@ -122,7 +135,13 @@ loadPreview()
 
     <template #actions>
       <v-btn variant="text" @click="emit('close')">Закрыть</v-btn>
-      <v-btn color="primary" variant="flat" :disabled="loading" prepend-icon="systemIcons:iconExport" @click="saveReport">
+      <v-btn
+        color="primary"
+        variant="flat"
+        :disabled="loading"
+        prepend-icon="systemIcons:iconExport"
+        @click="saveReport"
+      >
         Сохранить ({{ format.toUpperCase() }})
       </v-btn>
     </template>

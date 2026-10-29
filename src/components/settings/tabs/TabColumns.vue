@@ -1,24 +1,24 @@
 <script setup>
-import { useAppStore } from "../../../store.js"
+import { useColumnsStore } from "../../../stores/columns.js"
 
-const store = useAppStore()
+const columnsStore = useColumnsStore()
 
 function moveUp(i) {
-  if (i > 0) store.moveColumn(i, i - 1)
+  if (i > 0) columnsStore.move(i, i - 1)
 }
 
 function moveDown(i) {
-  if (i < store.columns.length - 1) store.moveColumn(i, i + 1)
+  if (i < columnsStore.columns.length - 1) columnsStore.move(i, i + 1)
 }
 
 function setVisible(key, visible) {
-  store.setColumnVisible(key, visible)
+  columnsStore.setVisible(key, visible)
 }
 </script>
 
 <template>
   <v-list density="compact" class="columns-tab">
-    <v-list-item v-for="(col, i) in store.columns" :key="col.key">
+    <v-list-item v-for="(col, i) in columnsStore.columns" :key="col.key">
       <div class="d-flex align-center">
         <v-checkbox
           :model-value="col.visible"
@@ -37,7 +37,7 @@ function setVisible(key, visible) {
           icon
           size="small"
           variant="text"
-          :disabled="i === store.columns.length - 1"
+          :disabled="i === columnsStore.columns.length - 1"
           title="Вниз"
           @click="moveDown(i)"
         >
@@ -46,5 +46,5 @@ function setVisible(key, visible) {
       </div>
     </v-list-item>
   </v-list>
-  <v-btn variant="tonal" @click="store.resetColumns()">По умолчанию</v-btn>
+  <v-btn variant="tonal" @click="columnsStore.reset()">По умолчанию</v-btn>
 </template>

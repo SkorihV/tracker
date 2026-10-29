@@ -116,7 +116,7 @@ pub fn apply_filter(tasks: &[Task], f: &TaskFilter, now: NaiveDateTime) -> Vec<A
         }
         out.push(t);
     }
-    out.sort_by(|a, b| b.start_date().cmp(&a.start_date()));
+    out.sort_by_key(|t| std::cmp::Reverse(t.start_date()));
     out.into_iter().map(|t| AppTask::from_task(t, now)).collect()
 }
 
@@ -179,6 +179,7 @@ pub fn build_totals(tasks: &[AppTask]) -> Totals {
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
+#[allow(clippy::large_enum_variant)] // строки таблицы собираются списком и сразу уходят в JSON
 pub enum ViewRow {
     Group {
         label: String,
@@ -201,7 +202,7 @@ pub fn build_rows(tasks: &[AppTask], grouping: &str) -> Vec<ViewRow> {
                 entry.1.push(t.clone());
             }
             let mut items: Vec<_> = map.into_values().collect();
-            items.sort_by(|a, b| b.0.cmp(&a.0));
+            items.sort_by_key(|item| std::cmp::Reverse(item.0));
             for (date, group) in items {
                 let total: f64 = group.iter().map(|t| t.seconds).sum();
                 rows.push(ViewRow::Group {

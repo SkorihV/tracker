@@ -1,11 +1,11 @@
 <script setup>
-import {defineProps} from 'vue'
+import { defineProps } from "vue"
 
-const props = defineProps({
-  task: Object
+defineProps({
+  task: Object,
 })
 
-defineOptions({name:'TaskComment'})
+defineOptions({ name: "TaskComment" })
 </script>
 
 <template>
@@ -13,7 +13,6 @@ defineOptions({name:'TaskComment'})
 </template>
 
 <style lang="scss" scoped>
-
 .comment-cell {
   display: -webkit-box;
   -webkit-line-clamp: 3;

@@ -1,8 +1,8 @@
 <script setup>
-import {defineProps} from 'vue'
-import {fmtTd} from "../../../api.js"
+import { defineProps } from "vue"
+import { fmtTd } from "../../../api.js"
 
-const props = defineProps({
+defineProps({
   item: Object,
   columns: Array,
   toggleGroup: Function,
@@ -23,7 +23,7 @@ function groupTime(item) {
   return { count: tasks.length, time: fmtTd(total) }
 }
 
-defineOptions({name:'TaskGroupHeader'})
+defineOptions({ name: "TaskGroupHeader" })
 </script>
 
 <template>
@@ -31,7 +31,9 @@ defineOptions({name:'TaskGroupHeader'})
     <td :colspan="columns?.length || 0">
       <div class="d-flex align-center ga-1">
         <v-btn icon size="x-small" variant="text" density="default" @click="toggleGroup && toggleGroup(item)">
-          <v-icon size="x-large">{{ isGroupOpen && isGroupOpen(item) ? 'mdi-chevron-down' : 'mdi-chevron-right' }}</v-icon>
+          <v-icon size="x-large">{{
+            isGroupOpen && isGroupOpen(item) ? "mdi-chevron-down" : "mdi-chevron-right"
+          }}</v-icon>
         </v-btn>
         <span class="font-weight-bold text-body-2">{{ groupLabel(item) }}</span>
         <span class="text-medium-emphasis text-caption ml-1">

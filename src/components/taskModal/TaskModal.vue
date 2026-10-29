@@ -1,6 +1,7 @@
 <script setup>
 import { reactive, computed, ref } from "vue"
-import { useAppStore } from "../../store.js"
+import { useDictionariesStore } from "../../stores/dictionaries.js"
+import { useSettingsStore } from "../../stores/settings.js"
 import RangesModal from "../range/RangesModal.vue"
 import BaseModal from "../base/BaseModal.vue"
 import OrderNumbersEditor from "./OrderNumbersEditor.vue"
@@ -8,7 +9,8 @@ import TaskStatusSelector from "./TaskStatusSelector.vue"
 import TaskDateFields from "./TaskDateFields.vue"
 import { isDateTimeValid } from "../../dateRules.js"
 
-const store = useAppStore()
+const dicts = useDictionariesStore()
+const settingsStore = useSettingsStore()
 const ordersEditor = ref(null)
 
 const props = defineProps({
@@ -28,7 +30,7 @@ const isEdit = props.draft.mode === "edit"
 const form = reactive({
   mode: props.draft.mode,
   taskId: props.draft.taskId || "",
-  user: props.draft.user || store.settings.username || "",
+  user: props.draft.user || settingsStore.settings.username || "",
   orders: [...(props.draft.orders || [])],
   orderInput: "",
   tags: props.draft.tags || [],
@@ -46,17 +48,11 @@ const baseEnd = ref(form.end)
 const rangesLines = ref(null)
 const rangesDirty = ref(false)
 const showRanges = ref(false)
-const rangesText = ref(
-  (props.draft.ranges || [])
-    .map((r) => (r.stop ? `${r.start} — ${r.stop}` : r.start))
-    .join("\n")
-)
+const rangesText = ref((props.draft.ranges || []).map((r) => (r.stop ? `${r.start} — ${r.stop}` : r.start)).join("\n"))
 
 const hasMultiRanges = isEdit && (props.draft.intervalsCount || 1) > 1
 
-const title = computed(() =>
-  form.mode === "new" ? "Новая задача" : `Задача ${form.taskId}`
-)
+const title = computed(() => (form.mode === "new" ? "Новая задача" : `Задача ${form.taskId}`))
 
 function submit() {
   ordersEditor.value?.add()
@@ -105,7 +101,7 @@ function onRangesSave(lines) {
   <BaseModal max-width="900px" persistent :title="title" @close="onClose">
     <v-autocomplete
       v-model="form.user"
-      :items="store.users.map((u) => ({ title: u, value: u }))"
+      :items="dicts.users.map((u) => ({ title: u, value: u }))"
       label="Пользователь"
       density="compact"
       variant="outlined"
@@ -117,33 +113,31 @@ function onRangesSave(lines) {
       <v-row class="ga-4">
         <v-col cols="6">
           <v-autocomplete
-              v-model="form.tags"
-              :items="store.tags.map((t) => ({ title: t.name, value: t.name }))"
-              label="Теги"
-              density="compact"
-              variant="outlined"
-              clearable
-              multiple
-              chips
-              prepend-inner-icon="mdi-tag-outline"
+            v-model="form.tags"
+            :items="dicts.tags.map((t) => ({ title: t.name, value: t.name }))"
+            label="Теги"
+            density="compact"
+            variant="outlined"
+            clearable
+            multiple
+            chips
+            prepend-inner-icon="mdi-tag-outline"
           />
         </v-col>
         <v-col cols="6">
           <v-combobox
-              v-model="form.client"
-              :items="store.clients.map((c) => c.name)"
-              label="Клиент"
-              density="compact"
-              variant="outlined"
-              clearable
-              prepend-inner-icon="systemIcons:iconClient"
-              hint="Можно ввести нового клиента"
-              persistent-hint
+            v-model="form.client"
+            :items="dicts.clients.map((c) => c.name)"
+            label="Клиент"
+            density="compact"
+            variant="outlined"
+            clearable
+            prepend-inner-icon="systemIcons:iconClient"
+            hint="Можно ввести нового клиента"
+            persistent-hint
           />
         </v-col>
       </v-row>
-
-
     </div>
     <task-status-selector v-model:status="form.customStatus" v-model:our-car="form.ourCar" />
     <task-date-fields v-model:start="form.start" v-model:end="form.end" />
@@ -172,10 +166,5 @@ function onRangesSave(lines) {
     </template>
   </BaseModal>
 
-  <RangesModal
-    v-if="showRanges"
-    :text="rangesText"
-    @save="onRangesSave"
-    @close="showRanges = false"
-  />
+  <RangesModal v-if="showRanges" :text="rangesText" @save="onRangesSave" @close="showRanges = false" />
 </template>

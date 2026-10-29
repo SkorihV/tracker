@@ -1,6 +1,5 @@
 <script setup>
-
-const props = defineProps({
+defineProps({
   title: { type: String, default: "" },
   persistent: { type: Boolean, default: false },
   maxWidth: { type: [Number, String], default: 600 },
@@ -12,7 +11,7 @@ const props = defineProps({
 
 const emit = defineEmits(["close"])
 
-defineOptions({name:'BaseModal'})
+defineOptions({ name: "BaseModal" })
 </script>
 
 <template>
@@ -44,6 +43,4 @@ defineOptions({name:'BaseModal'})
   </v-dialog>
 </template>
 
-<style lang="scss">
-
-</style>
+<style lang="scss"></style>
