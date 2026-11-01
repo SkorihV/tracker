@@ -78,29 +78,39 @@ loadStats()
 </script>
 
 <template>
-  <BaseModal title="Статистика" max-width="1000" width="1000" max-height="85vh" @close="emit('close')">
-    <BasePeriodFields v-model:date-from="dateFrom" v-model:date-to="dateTo" v-model:format="format" />
-
-    <v-alert v-if="error" type="error" density="compact" variant="tonal" class="mb-3">
-      {{ error }}
-    </v-alert>
-    <v-alert v-if="saved" type="success" density="compact" variant="tonal" class="mb-3">
-      Сохранено: {{ saved }}
-    </v-alert>
-
-    <template v-if="stats">
-      <div class="d-flex gap-4 mb-3 flex-wrap">
-        <v-chip size="small" variant="tonal" class="mr-2">
+  <BaseModal
+    title="Статистика"
+    body-class="pt-1 modal-body--fill"
+    max-width="1000"
+    width="1000"
+    max-height="85vh"
+    @close="emit('close')"
+  >
+    <template #header>
+      <BasePeriodFields v-model:date-from="dateFrom" v-model:date-to="dateTo" v-model:format="format" />
+      <v-alert v-if="error" type="error" density="compact" variant="tonal" class="mb-3">
+        {{ error }}
+      </v-alert>
+      <v-alert v-if="saved" type="success" density="compact" variant="tonal" class="mb-3">
+        Сохранено: {{ saved }}
+      </v-alert>
+      <div v-if="stats" class="d-flex ga-2 mb-3 flex-wrap">
+        <v-chip size="small" variant="tonal">
           Записей: <b class="ml-1">{{ stats.count }}</b>
         </v-chip>
-        <v-chip size="small" variant="tonal" class="mr-2">
-          Общее время: <b class="mono ml-1">{{ stats.totalLabel }}</b>
+        <v-chip size="small" variant="tonal">
+          Сумма по задачам: <b class="mono ml-1">{{ stats.totalLabel }}</b>
         </v-chip>
-        <v-chip size="small" variant="tonal" class="mr-2">
+        <v-chip size="small" variant="tonal">
+          Фактическое время: <b class="mono ml-1">{{ stats.actualLabel }}</b>
+        </v-chip>
+        <v-chip size="small" variant="tonal">
           Среднее: <b class="mono ml-1">{{ stats.avgLabel }}</b>
         </v-chip>
       </div>
+    </template>
 
+    <div v-if="stats" class="stats-scroll">
       <div v-for="sec in sections" :key="sec.title" class="mb-4">
         <h3 class="text-subtitle-2 mb-1">{{ sec.title }}</h3>
         <v-table v-if="sec.items.length" density="compact" class="max-width-table">
@@ -108,7 +118,8 @@ loadStats()
             <tr>
               <th>Имя</th>
               <th>Задач</th>
-              <th>Общее время</th>
+              <th>Сумма по задачам</th>
+              <th>Фактическое время</th>
               <th>Среднее</th>
             </tr>
           </thead>
@@ -117,13 +128,14 @@ loadStats()
               <td>{{ it.name }}</td>
               <td>{{ it.count }}</td>
               <td class="mono">{{ it.totalLabel }}</td>
+              <td class="mono">{{ it.actualLabel }}</td>
               <td class="mono">{{ it.avgLabel }}</td>
             </tr>
           </tbody>
         </v-table>
         <div v-else class="text-medium-emphasis text-caption">Нет данных</div>
       </div>
-    </template>
+    </div>
     <div v-if="loading" class="text-medium-emphasis text-caption">Загрузка…</div>
 
     <template #actions>

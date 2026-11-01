@@ -93,13 +93,14 @@ async function doImport() {
 
 <template>
   <BaseModal title="Экспорт / Импорт" @close="emit('close')">
-    <v-tabs v-model="tab" color="primary" class="mb-4">
-      <v-tab value="export">Экспорт</v-tab>
-      <v-tab value="import">Импорт</v-tab>
-    </v-tabs>
-
-    <v-alert v-if="error" type="error" density="compact" variant="tonal" class="mb-3">{{ error }}</v-alert>
-    <v-alert v-if="notice" type="success" density="compact" variant="tonal" class="mb-3">{{ notice }}</v-alert>
+    <template #header>
+      <v-tabs v-model="tab" color="primary" class="mb-4">
+        <v-tab value="export">Экспорт</v-tab>
+        <v-tab value="import">Импорт</v-tab>
+      </v-tabs>
+      <v-alert v-if="error" type="error" density="compact" variant="tonal" class="mb-3">{{ error }}</v-alert>
+      <v-alert v-if="notice" type="success" density="compact" variant="tonal" class="mb-3">{{ notice }}</v-alert>
+    </template>
 
     <template v-if="tab === 'export'">
       <v-text-field

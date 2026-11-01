@@ -141,6 +141,9 @@ function onRangesSave(lines) {
     </div>
     <task-status-selector v-model:status="form.customStatus" v-model:our-car="form.ourCar" />
     <task-date-fields v-model:start="form.start" v-model:end="form.end" />
+    <div v-if="hasMultiRanges" class="text-caption text-medium-emphasis mb-2">
+      Даты выше относятся к текущему диапазону (последнему из {{ draft.intervalsCount }}).
+    </div>
     <v-btn
       v-if="hasMultiRanges"
       variant="tonal"

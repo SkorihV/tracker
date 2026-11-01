@@ -1,5 +1,3 @@
-import { computed } from "vue"
-
 const INTERACTIVE = "input, textarea, select, .v-btn, .v-select, .v-autocomplete, .v-menu, .v-list-item"
 
 /**
@@ -10,14 +8,6 @@ const INTERACTIVE = "input, textarea, select, .v-btn, .v-select, .v-autocomplete
  * @param {import("vue").Ref<Set<string>>} selectedIds выбранные taskId (v-model)
  */
 export function useRowSelection(rows, selectedIds) {
-  /** Массив для v-model таблицы Vuetify. */
-  const selectedArray = computed({
-    get: () => Array.from(selectedIds.value || new Set()),
-    set: (v) => {
-      selectedIds.value = new Set(v || [])
-    },
-  })
-
   function rowProps({ internalItem }) {
     const id = internalItem?.raw?.taskId
     return selectedIds.value.has(id) ? { class: "row-selected" } : {}
@@ -48,5 +38,5 @@ export function useRowSelection(rows, selectedIds) {
     selectedIds.value = next
   }
 
-  return { selectedArray, rowProps, onRowClick }
+  return { rowProps, onRowClick }
 }

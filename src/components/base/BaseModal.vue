@@ -32,6 +32,9 @@ defineOptions({ name: "BaseModal" })
           <v-icon>mdi-close</v-icon>
         </v-btn>
       </v-toolbar>
+      <div v-if="$slots.header" class="modal-header px-4 pt-4">
+        <slot name="header" />
+      </div>
       <v-card-text :class="bodyClass">
         <slot />
       </v-card-text>

@@ -7,6 +7,7 @@ import { useTasksStore } from "../../stores/tasks.js"
 import { reportFilter, today } from "../../reportFilter.js"
 import BaseModal from "../base/BaseModal.vue"
 import BasePeriodFields from "../base/BasePeriodFields.vue"
+import ReportTags from "./ReportTags.vue"
 
 const columnsStore = useColumnsStore()
 const tasksStore = useTasksStore()
@@ -90,35 +91,43 @@ loadPreview()
 </script>
 
 <template>
-  <BaseModal title="Отчёт" max-width="1000" width="1000" max-height="85vh" @close="emit('close')">
-    <BasePeriodFields
-      v-model:date-from="dateFrom"
-      v-model:date-to="dateTo"
-      v-model:format="format"
-      empty-hint="пусто = без ограничения"
-    />
-
-    <v-alert v-if="error" type="error" density="compact" variant="tonal" class="mb-3">
-      {{ error }}
-    </v-alert>
-    <v-alert v-if="saved" type="success" density="compact" variant="tonal" class="mb-3">
-      Сохранено: {{ saved }}
-    </v-alert>
-
-    <template v-if="preview">
-      <div class="d-flex gap-4 mb-3 flex-wrap">
-        <v-chip size="small" variant="tonal" class="mr-2">
+  <BaseModal
+    title="Отчёт"
+    body-class="pt-1 modal-body--fill"
+    max-width="1000"
+    width="1000"
+    max-height="85vh"
+    @close="emit('close')"
+  >
+    <template #header>
+      <BasePeriodFields
+        v-model:date-from="dateFrom"
+        v-model:date-to="dateTo"
+        v-model:format="format"
+        empty-hint="пусто = без ограничения"
+      />
+      <v-alert v-if="error" type="error" density="compact" variant="tonal" class="mb-3">
+        {{ error }}
+      </v-alert>
+      <v-alert v-if="saved" type="success" density="compact" variant="tonal" class="mb-3">
+        Сохранено: {{ saved }}
+      </v-alert>
+      <div v-if="preview" class="d-flex ga-2 mb-3 flex-wrap">
+        <v-chip size="small" variant="tonal">
           Записей: <b class="ml-1">{{ preview.count }}</b>
         </v-chip>
-        <v-chip size="small" variant="tonal" class="mr-2">
-          Общее время: <b class="mono ml-1">{{ preview.totalLabel }}</b>
+        <v-chip size="small" variant="tonal">
+          Сумма по задачам: <b class="mono ml-1">{{ preview.totalLabel }}</b>
         </v-chip>
-        <v-chip v-for="t in preview.byTag" :key="t.name" size="small" variant="tonal" class="mr-2">
-          {{ t.name }}: {{ t.timeLabel }}
+        <v-chip size="small" variant="tonal">
+          Фактическое время: <b class="mono ml-1">{{ preview.actualLabel }}</b>
         </v-chip>
       </div>
+      <report-tags v-if="preview" :tags="preview.byTag" class="mb-3" />
+    </template>
 
-      <v-table density="compact" class="max-width-table">
+    <template v-if="preview">
+      <v-table density="compact" fixed-header class="max-width-table report-table">
         <thead>
           <tr>
             <th v-for="col in previewColumns" :key="col.title">{{ col.title }}</th>

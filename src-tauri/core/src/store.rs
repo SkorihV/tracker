@@ -6,7 +6,7 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use crate::dt::{now_naive, parse_dt};
-use crate::logic::{build_rows, build_totals, apply_filter, TaskFilter, TaskIdGen, Totals, ViewRow};
+use crate::logic::{build_rows, build_totals, filter_tasks, sort_for_table, TaskFilter, TaskIdGen, Totals, ViewRow};
 use crate::models::{AppState, AppTask, ColumnPref, Entity, Interval, Settings, StatusDef, Task, TaskDraft, TaskStatus};
 
 /// Действие таймера над задачей.
@@ -203,9 +203,11 @@ impl Store {
 
     pub fn query(&self, filter: &TaskFilter) -> (Vec<ViewRow>, Totals) {
         let now = now_naive();
-        let filtered = apply_filter(&self.tasks, filter, now);
-        let rows = build_rows(&filtered, &self.settings.grouping);
-        let totals = build_totals(&filtered);
+        let mut filtered = filter_tasks(&self.tasks, filter);
+        sort_for_table(&mut filtered);
+        let app_tasks: Vec<AppTask> = filtered.iter().map(|t| AppTask::from_task(t, now)).collect();
+        let rows = build_rows(&app_tasks, &self.settings.grouping);
+        let totals = build_totals(&filtered, now);
         (rows, totals)
     }
 

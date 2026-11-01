@@ -70,7 +70,9 @@ pub struct TaskFilter {
     pub search: String,
 }
 
-pub fn apply_filter(tasks: &[Task], f: &TaskFilter, now: NaiveDateTime) -> Vec<AppTask> {
+/// Отобрать задачи по фильтру, новые сверху. Единая точка отбора для таблицы,
+/// итогов, отчётов и статистики: так цифры везде совпадают.
+pub fn filter_tasks<'a>(tasks: &'a [Task], f: &TaskFilter) -> Vec<&'a Task> {
     let from = parse_date(&f.date_from);
     let to = parse_date(&f.date_to);
     let q = f.search.trim().to_lowercase();
@@ -117,58 +119,140 @@ pub fn apply_filter(tasks: &[Task], f: &TaskFilter, now: NaiveDateTime) -> Vec<A
         out.push(t);
     }
     out.sort_by_key(|t| std::cmp::Reverse(t.start_date()));
-    out.into_iter().map(|t| AppTask::from_task(t, now)).collect()
+    out
+}
+
+/// Порядок строк основной таблицы по умолчанию: запущенные, на паузе, завершённые;
+/// внутри каждой группы — по самому первому началу задачи (как в колонке «Начало»), новые сверху.
+pub fn sort_for_table(tasks: &mut [&Task]) {
+    tasks.sort_by_key(|t| (t.status.rank(), std::cmp::Reverse(t.start_date())));
+}
+
+pub fn apply_filter(tasks: &[Task], f: &TaskFilter, now: NaiveDateTime) -> Vec<AppTask> {
+    filter_tasks(tasks, f)
+        .into_iter()
+        .map(|t| AppTask::from_task(t, now))
+        .collect()
 }
 
 // ---------------------------------------------------------------------
 // Итоги
 // ---------------------------------------------------------------------
 
+/// Два способа посчитать время набора задач.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct TimeSums {
+    /// «Сумма по задачам»: время каждой задачи складывается отдельно,
+    /// одновременно идущие задачи считаются несколько раз.
+    pub sum: f64,
+    /// «Фактическое время»: объединение отрезков работы всех задач,
+    /// пересечения по времени считаются один раз.
+    pub actual: f64,
+}
+
+/// Секунды, в которые шла хотя бы одна из задач (отрезки объединяются).
+pub fn union_seconds(tasks: &[&Task], now: NaiveDateTime) -> f64 {
+    let mut spans: Vec<_> = tasks.iter().flat_map(|t| t.spans(now)).collect();
+    spans.sort();
+    let mut total = 0_i64;
+    let mut current: Option<(NaiveDateTime, NaiveDateTime)> = None;
+    for (start, stop) in spans {
+        current = match current {
+            Some((cs, ce)) if start <= ce => Some((cs, ce.max(stop))),
+            Some((cs, ce)) => {
+                total += (ce - cs).num_seconds();
+                Some((start, stop))
+            }
+            None => Some((start, stop)),
+        };
+    }
+    if let Some((cs, ce)) = current {
+        total += (ce - cs).num_seconds();
+    }
+    total as f64
+}
+
+pub fn time_sums(tasks: &[&Task], now: NaiveDateTime) -> TimeSums {
+    TimeSums {
+        sum: tasks.iter().map(|t| t.total_seconds(now)).sum(),
+        actual: union_seconds(tasks, now),
+    }
+}
+
+/// Группировка по тегам: задача без тегов попадает в «(без тега)»,
+/// задача с несколькими тегами — в каждую свою группу.
+pub fn group_by_tag<'a>(tasks: &[&'a Task]) -> HashMap<String, Vec<&'a Task>> {
+    let mut map: HashMap<String, Vec<&'a Task>> = HashMap::new();
+    for &t in tasks {
+        let tags: Vec<&str> = t.tags.iter().map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+        if t.tags.is_empty() {
+            map.entry("(без тега)".to_string()).or_default().push(t);
+        }
+        for tag in tags {
+            map.entry(tag.to_string()).or_default().push(t);
+        }
+    }
+    map
+}
+
+/// Свод «тег → две суммы времени».
+pub fn tag_sums(tasks: &[&Task], now: NaiveDateTime) -> HashMap<String, TimeSums> {
+    group_by_tag(tasks)
+        .into_iter()
+        .map(|(name, group)| (name, time_sums(&group, now)))
+        .collect()
+}
+
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TotalLine {
     pub name: String,
+    /// Сумма по задачам, секунды.
     pub seconds: f64,
     pub time_label: String,
+    /// Фактическое время, секунды.
+    pub actual_seconds: f64,
+    pub actual_label: String,
+}
+
+impl TotalLine {
+    pub fn new(name: String, sums: TimeSums) -> TotalLine {
+        TotalLine {
+            name,
+            seconds: sums.sum,
+            time_label: fmt_td(sums.sum),
+            actual_seconds: sums.actual,
+            actual_label: fmt_td(sums.actual),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Totals {
     pub count: usize,
+    /// Сумма по задачам, секунды.
     pub total_seconds: f64,
     pub time_label: String,
+    /// Фактическое время, секунды.
+    pub actual_seconds: f64,
+    pub actual_label: String,
     pub by_tag: Vec<TotalLine>,
 }
 
-pub fn build_totals(tasks: &[AppTask]) -> Totals {
-    let total: f64 = tasks.iter().map(|t| t.seconds).sum();
-    let mut map: HashMap<String, f64> = HashMap::new();
-    for t in tasks {
-        if t.tags.is_empty() {
-            *map.entry("(без тега)".to_string()).or_insert(0.0) += t.seconds;
-        } else {
-            for tag in &t.tags {
-                if tag.trim().is_empty() {
-                    continue;
-                }
-                *map.entry(tag.trim().to_string()).or_insert(0.0) += t.seconds;
-            }
-        }
-    }
-    let mut by_tag: Vec<TotalLine> = map
+pub fn build_totals(tasks: &[&Task], now: NaiveDateTime) -> Totals {
+    let sums = time_sums(tasks, now);
+    let mut by_tag: Vec<TotalLine> = tag_sums(tasks, now)
         .into_iter()
-        .map(|(name, seconds)| TotalLine {
-            name,
-            seconds,
-            time_label: fmt_td(seconds),
-        })
+        .map(|(name, s)| TotalLine::new(name, s))
         .collect();
     by_tag.sort_by(|a, b| b.seconds.partial_cmp(&a.seconds).unwrap_or(std::cmp::Ordering::Equal));
     Totals {
         count: tasks.len(),
-        total_seconds: total,
-        time_label: fmt_td(total),
+        total_seconds: sums.sum,
+        time_label: fmt_td(sums.sum),
+        actual_seconds: sums.actual,
+        actual_label: fmt_td(sums.actual),
         by_tag,
     }
 }

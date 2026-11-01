@@ -1,5 +1,5 @@
 <script setup>
-import { ref, nextTick } from "vue"
+import { computed, ref, nextTick } from "vue"
 import BaseConfirmDialog from "../../base/BaseConfirmDialog.vue"
 import { useSettingsStore } from "../../../stores/settings.js"
 
@@ -17,6 +17,8 @@ const newName = ref("")
 const editingKey = ref(null)
 const editName = ref("")
 const pendingDelete = ref(null)
+// Удалённый тег пропадает и из самих задач, поэтому о нём предупреждаем отдельно.
+const removalNote = computed(() => (props.kind === "tag" ? " и снимается со всех задач" : ""))
 const pendingClear = ref(false)
 const editInputs = {}
 
@@ -179,14 +181,14 @@ function move(index, step) {
     <BaseConfirmDialog
       v-if="pendingDelete"
       :title="`Удалить «${pendingDelete.name}»?`"
-      :message="`«${pendingDelete.name}» будет удален безвозвратно из ${props.title.toLowerCase()}. Продолжить?`"
+      :message="`«${pendingDelete.name}» будет удален безвозвратно из ${props.title.toLowerCase()}${removalNote}. Продолжить?`"
       @confirm="confirmRemove"
       @close="pendingDelete = null"
     />
     <BaseConfirmDialog
       v-if="pendingClear"
       title="Удалить все элементы?"
-      :message="`Все элементы будут удалены безвозвратно из ${props.title.toLowerCase()}. Продолжить?`"
+      :message="`Все элементы будут удалены безвозвратно из ${props.title.toLowerCase()}${removalNote}. Продолжить?`"
       @confirm="confirmClear"
       @close="pendingClear = false"
     />

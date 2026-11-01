@@ -42,3 +42,20 @@ export function readColumnWidths() {
 export function saveColumnWidths(widths) {
   writeCookie("tt_colwidth", JSON.stringify(widths || {}))
 }
+
+/** Сколько задач можно закрепить: список хранится в cookie (лимит ~4 КБ). */
+export const MAX_PINNED = 100
+
+/** Закреплённые задачи: массив taskId в порядке закрепления. */
+export function readPinnedIds() {
+  try {
+    const arr = JSON.parse(readCookie("tt_pinned") || "[]")
+    return Array.isArray(arr) ? arr.filter((id) => typeof id === "string").slice(0, MAX_PINNED) : []
+  } catch {
+    return []
+  }
+}
+
+export function savePinnedIds(ids) {
+  writeCookie("tt_pinned", JSON.stringify(ids.slice(0, MAX_PINNED)))
+}

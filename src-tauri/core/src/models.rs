@@ -194,6 +194,15 @@ pub enum TaskStatus {
 }
 
 impl TaskStatus {
+    /// Порядок в таблице: сначала идущие, потом на паузе, потом завершённые.
+    pub fn rank(&self) -> u8 {
+        match self {
+            TaskStatus::Running => 0,
+            TaskStatus::Paused => 1,
+            TaskStatus::Completed => 2,
+        }
+    }
+
     pub fn as_str(&self) -> &'static str {
         match self {
             TaskStatus::Running => "running",
@@ -367,6 +376,27 @@ impl Task {
     }
 
     /// Суммарное время в секундах, включая открытый интервал (как Python).
+    /// Начало текущего (последнего) диапазона: у идущей задачи — момент последнего запуска.
+    pub fn current_start(&self) -> NaiveDateTime {
+        self.intervals.last().map(|i| i.start).unwrap_or_else(|| self.start_date())
+    }
+
+    /// Отрезки работы `[start, stop]`; открытый последний диапазон заканчивается в `now`.
+    pub fn spans(&self, now: NaiveDateTime) -> Vec<(NaiveDateTime, NaiveDateTime)> {
+        let mut out: Vec<_> = self
+            .intervals
+            .iter()
+            .filter_map(|i| i.stop.map(|stop| (i.start, stop)))
+            .filter(|(start, stop)| stop > start)
+            .collect();
+        if let Some(last) = self.intervals.last() {
+            if last.stop.is_none() && now > last.start {
+                out.push((last.start, now));
+            }
+        }
+        out
+    }
+
     pub fn total_seconds(&self, now: NaiveDateTime) -> f64 {
         let mut total = 0.0_f64;
         for seg in &self.intervals {
@@ -482,6 +512,9 @@ pub struct AppTask {
     #[serde(rename = "end")]
     pub end_label: Option<String>,
     pub intervals_count: usize,
+    /// Начало и завершение текущего (последнего) диапазона — их правит окно редактирования.
+    pub current_start: String,
+    pub current_end: Option<String>,
     pub ranges: Vec<AppInterval>,
     #[serde(rename = "ourCar")]
     pub our_car: bool,
@@ -511,6 +544,8 @@ impl AppTask {
             start_label: fmt_dt(t.start_date()),
             end_label: t.end().map(fmt_dt),
             intervals_count: t.intervals.len(),
+            current_start: fmt_dt(t.current_start()),
+            current_end: t.end().map(fmt_dt),
             ranges: t
                 .intervals
                 .iter()

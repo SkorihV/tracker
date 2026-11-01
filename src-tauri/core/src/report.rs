@@ -10,8 +10,8 @@ use std::path::{Path, PathBuf};
 use chrono::Local;
 use serde::Serialize;
 
-use crate::dt::{fmt_td, now_naive, parse_date};
-use crate::logic::{TaskFilter, TotalLine};
+use crate::dt::{fmt_td, now_naive};
+use crate::logic::{filter_tasks, group_by_tag, tag_sums, time_sums, TaskFilter, TimeSums, TotalLine};
 use crate::models::{ColumnPref, Task, TaskStatus};
 
 // ---------------------------------------------------------------------
@@ -138,7 +138,10 @@ pub struct ReportRow {
 pub struct ReportPreview {
     pub rows: Vec<ReportRow>,
     pub count: usize,
+    /// Сумма по задачам.
     pub total_label: String,
+    /// Фактическое время (пересечения считаются один раз).
+    pub actual_label: String,
     pub by_tag: Vec<TotalLine>,
 }
 
@@ -151,7 +154,10 @@ pub struct ReportPreview {
 pub struct StatsLine {
     pub name: String,
     pub count: usize,
+    /// Сумма по задачам.
     pub total_label: String,
+    /// Фактическое время (пересечения считаются один раз).
+    pub actual_label: String,
     pub avg_label: String,
 }
 
@@ -159,7 +165,10 @@ pub struct StatsLine {
 #[serde(rename_all = "camelCase")]
 pub struct Stats {
     pub count: usize,
+    /// Сумма по задачам.
     pub total_label: String,
+    /// Фактическое время (пересечения считаются один раз).
+    pub actual_label: String,
     pub avg_label: String,
     pub by_user: Vec<StatsLine>,
     pub by_client: Vec<StatsLine>,
@@ -176,156 +185,45 @@ pub struct Stats {
 /// по убыванию старта (как Python `Store.filtered`). Поиск не используется,
 /// но поддерживается фильтром.
 pub fn filtered_tasks<'a>(tasks: &'a [Task], f: &TaskFilter) -> Vec<&'a Task> {
-    let from = parse_date(&f.date_from);
-    let to = parse_date(&f.date_to);
-    let q = f.search.trim().to_lowercase();
-    let want_tags: Vec<String> = f
-        .tags
-        .iter()
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
+    filter_tasks(tasks, f)
+}
+
+fn stats_line(name: String, group: &[&Task], now: chrono::NaiveDateTime) -> (f64, StatsLine) {
+    let sums = time_sums(group, now);
+    let count = group.len();
+    let avg = if count > 0 { sums.sum / count as f64 } else { 0.0 };
+    let line = StatsLine {
+        name,
+        count,
+        total_label: fmt_td(sums.sum),
+        actual_label: fmt_td(sums.actual),
+        avg_label: fmt_td(avg),
+    };
+    (sums.sum, line)
+}
+
+/// Строки «Имя | Задач | Сумма по задачам | Фактическое время | Среднее»,
+/// сортировка по сумме по задачам. Фактическое время считается внутри каждой группы.
+fn lines_from_groups(map: HashMap<String, Vec<&Task>>, now: chrono::NaiveDateTime) -> Vec<StatsLine> {
+    let mut lines: Vec<(f64, StatsLine)> = map
+        .into_iter()
+        .map(|(name, group)| stats_line(name, &group, now))
         .collect();
-    let mut out: Vec<&Task> = Vec::new();
-    for t in tasks {
-        if let Some(d) = from {
-            if t.start_date().date() < d {
-                continue;
-            }
-        }
-        if let Some(d) = to {
-            if t.start_date().date() > d {
-                continue;
-            }
-        }
-        if !want_tags.is_empty() {
-            let hit = t.tags.iter().any(|tag| want_tags.iter().any(|w| tag == w));
-            if !hit {
-                continue;
-            }
-        }
-        if !f.client.trim().is_empty() && t.client != f.client.trim() {
-            continue;
-        }
-        if !f.user.trim().is_empty() && t.user != f.user.trim() {
-            continue;
-        }
-        if !q.is_empty() {
-            let tags_text = t.tags.join(" ");
-            let orders_text = t.orders.join(" ");
-            let hay = [&t.task_id, &orders_text, &tags_text, &t.client, &t.user, &t.comment];
-            if !hay.iter().any(|s| s.to_lowercase().contains(&q)) {
-                continue;
-            }
-        }
-        out.push(t);
-    }
-    out.sort_by_key(|t| std::cmp::Reverse(t.start_date()));
-    out
+    lines.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+    lines.into_iter().map(|(_, line)| line).collect()
 }
 
-fn total_seconds<'a, I>(items: I, now: chrono::NaiveDateTime) -> f64
-where
-    I: IntoIterator<Item = &'a Task>,
-{
-    items.into_iter().map(|t| t.total_seconds(now)).sum()
-}
-
-/// Свод «тег → секунды»: задача без тегов попадает в «(без тега)»,
-/// многозначная — в каждую строку своего тега.
-fn tag_seconds<'a, I>(items: I, now: chrono::NaiveDateTime) -> HashMap<String, f64>
-where
-    I: IntoIterator<Item = &'a Task>,
-{
-    let mut map: HashMap<String, f64> = HashMap::new();
-    for t in items {
-        if t.tags.is_empty() {
-            *map.entry("(без тега)".to_string()).or_insert(0.0) += t.total_seconds(now);
-        } else {
-            for tag in &t.tags {
-                if tag.trim().is_empty() {
-                    continue;
-                }
-                *map.entry(tag.trim().to_string()).or_insert(0.0) += t.total_seconds(now);
-            }
-        }
-    }
-    map
-}
-
-/// Разбивка «Имя | Задач | Общее время | Среднее», сортировка по времени.
 fn group_stats<'a>(tasks: &[&'a Task], key: impl Fn(&'a Task) -> String, now: chrono::NaiveDateTime) -> Vec<StatsLine> {
-    let mut map: HashMap<String, Vec<&Task>> = HashMap::new();
-    for t in tasks {
+    let mut map: HashMap<String, Vec<&'a Task>> = HashMap::new();
+    for &t in tasks {
         map.entry(key(t)).or_default().push(t);
     }
-    let mut lines: Vec<StatsLine> = map
-        .into_iter()
-        .map(|(name, group)| {
-            let secs = total_seconds(group.iter().copied(), now);
-            let count = group.len();
-            StatsLine {
-                name,
-                count,
-                total_label: fmt_td(secs),
-                avg_label: fmt_td(if count > 0 { secs / count as f64 } else { 0.0 }),
-            }
-        })
-        .collect();
-    lines.sort_by(|a, b| {
-        
-        fmt_to_secs(&b.total_label)
-            .partial_cmp(&fmt_to_secs(&a.total_label))
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
-    lines
+    lines_from_groups(map, now)
 }
 
-fn fmt_to_secs(label: &str) -> f64 {
-    let parts: Vec<&str> = label.split(':').collect();
-    if parts.len() != 3 {
-        return 0.0;
-    }
-    let h: f64 = parts[0].trim().parse().unwrap_or(0.0);
-    let m: f64 = parts[1].trim().parse().unwrap_or(0.0);
-    let s: f64 = parts[2].trim().parse().unwrap_or(0.0);
-    h * 3600.0 + m * 60.0 + s
-}
-
-/// Разбивка «по тегам» для статистики: многозначная задача входит во все
-/// свои теги. «(без тега)» — задач без тегов.
-fn tag_stats<'a>(list: &[&'a Task], now: chrono::NaiveDateTime) -> Vec<StatsLine> {
-    let mut map: HashMap<String, Vec<&'a Task>> = HashMap::new();
-    for t in list {
-        if t.tags.is_empty() {
-            map.entry("(без тега)".to_string()).or_default().push(t);
-        } else {
-            for tag in &t.tags {
-                if tag.trim().is_empty() {
-                    continue;
-                }
-                map.entry(tag.trim().to_string()).or_default().push(t);
-            }
-        }
-    }
-    let mut lines: Vec<StatsLine> = map
-        .into_iter()
-        .map(|(name, group)| {
-            let secs = total_seconds(group.iter().copied(), now);
-            let count = group.len();
-            StatsLine {
-                name,
-                count,
-                total_label: fmt_td(secs),
-                avg_label: fmt_td(if count > 0 { secs / count as f64 } else { 0.0 }),
-            }
-        })
-        .collect();
-    lines.sort_by(|a, b| {
-        fmt_to_secs(&b.total_label)
-            .partial_cmp(&fmt_to_secs(&a.total_label))
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
-    lines
+/// Разбивка «по тегам»: многозначная задача входит во все свои теги.
+fn tag_stats(list: &[&Task], now: chrono::NaiveDateTime) -> Vec<StatsLine> {
+    lines_from_groups(group_by_tag(list), now)
 }
 
 // ---------------------------------------------------------------------
@@ -335,7 +233,7 @@ fn tag_stats<'a>(list: &[&'a Task], now: chrono::NaiveDateTime) -> Vec<StatsLine
 pub fn report_preview(tasks: &[Task], f: &TaskFilter) -> ReportPreview {
     let now = now_naive();
     let list = filtered_tasks(tasks, f);
-    let secs = total_seconds(list.iter().copied(), now);
+    let sums = time_sums(&list, now);
     let rows: Vec<ReportRow> = list
         .iter()
         .map(|t| ReportRow {
@@ -355,20 +253,17 @@ pub fn report_preview(tasks: &[Task], f: &TaskFilter) -> ReportPreview {
         })
         .collect();
 
-    let mut by_tag: Vec<TotalLine> = tag_seconds(list.iter().copied(), now)
+    let mut by_tag: Vec<TotalLine> = tag_sums(&list, now)
         .into_iter()
-        .map(|(name, seconds)| TotalLine {
-            name,
-            seconds,
-            time_label: fmt_td(seconds),
-        })
+        .map(|(name, s)| TotalLine::new(name, s))
         .collect();
     by_tag.sort_by(|a, b| b.seconds.partial_cmp(&a.seconds).unwrap_or(std::cmp::Ordering::Equal));
 
     ReportPreview {
         rows,
         count: list.len(),
-        total_label: fmt_td(secs),
+        total_label: fmt_td(sums.sum),
+        actual_label: fmt_td(sums.actual),
         by_tag,
     }
 }
@@ -380,7 +275,7 @@ pub fn report_preview(tasks: &[Task], f: &TaskFilter) -> ReportPreview {
 pub fn statistics(tasks: &[Task], f: &TaskFilter) -> Stats {
     let now = now_naive();
     let list = filtered_tasks(tasks, f);
-    let secs = total_seconds(list.iter().copied(), now);
+    let sums = time_sums(&list, now);
     let count = list.len();
 
     let by_user = group_stats(&list, |t| {
@@ -406,8 +301,9 @@ pub fn statistics(tasks: &[Task], f: &TaskFilter) -> Stats {
 
     Stats {
         count,
-        total_label: fmt_td(secs),
-        avg_label: fmt_td(if count > 0 { secs / count as f64 } else { 0.0 }),
+        total_label: fmt_td(sums.sum),
+        actual_label: fmt_td(sums.actual),
+        avg_label: fmt_td(if count > 0 { sums.sum / count as f64 } else { 0.0 }),
         by_user,
         by_client,
         by_tag,
@@ -447,13 +343,13 @@ pub fn write_report(
     if list.is_empty() {
         return Err("Нет записей за выбранный период".to_string());
     }
-    let secs = total_seconds(list.iter().copied(), now);
-    let tag_map = tag_seconds(list.iter().copied(), now);
+    let sums = time_sums(&list, now);
+    let tag_map = tag_sums(&list, now);
 
     let dir = reports_dir(base);
     let ts = ts_stamp();
     let path = dir.join(format!("report_{ts}.{format}"));
-    write_report_body(&path, format, &list, secs, &tag_map, date_from, date_to, accent_color, columns)?;
+    write_report_body(&path, format, &list, sums, &tag_map, date_from, date_to, accent_color, columns)?;
     Ok(path)
 }
 
@@ -473,12 +369,12 @@ pub fn write_report_to(
     if list.is_empty() {
         return Err("Нет записей за выбранный период".to_string());
     }
-    let secs = total_seconds(list.iter().copied(), now);
-    let tag_map = tag_seconds(list.iter().copied(), now);
+    let sums = time_sums(&list, now);
+    let tag_map = tag_sums(&list, now);
     if let Some(parent) = path.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
-    write_report_body(path, format, &list, secs, &tag_map, date_from, date_to, accent_color, columns)?;
+    write_report_body(path, format, &list, sums, &tag_map, date_from, date_to, accent_color, columns)?;
     Ok(path.to_path_buf())
 }
 
@@ -486,8 +382,8 @@ fn write_report_body(
     path: &Path,
     format: &str,
     list: &[&Task],
-    secs: f64,
-    tag_map: &HashMap<String, f64>,
+    sums: TimeSums,
+    tag_map: &HashMap<String, TimeSums>,
     date_from: &str,
     date_to: &str,
     accent_color: &str,
@@ -495,11 +391,11 @@ fn write_report_body(
 ) -> Result<(), String> {
     match format {
         "txt" => {
-            let body = report_txt(list, secs, tag_map, date_from, date_to, now_naive());
+            let body = report_txt(list, sums, tag_map, date_from, date_to, now_naive());
             std::fs::write(path, body).map_err(|e| e.to_string())?;
         }
         "md" => {
-            let body = report_md(list, secs, tag_map, date_from, date_to);
+            let body = report_md(list, sums, tag_map, date_from, date_to);
             std::fs::write(path, body).map_err(|e| e.to_string())?;
         }
         "csv" => {
@@ -517,7 +413,7 @@ fn write_report_body(
             write_cp1251(path, &body)?;
         }
         "xlsx" => {
-            write_report_xlsx(path, list, secs, tag_map, date_from, date_to, accent_color, columns)?;
+            write_report_xlsx(path, list, sums, tag_map, date_from, date_to, accent_color, columns)?;
         }
         _ => return Err(format!("Неизвестный формат: {format}")),
     }
@@ -591,8 +487,10 @@ fn write_stats_body(
             body.push_str(&row_csv(&[
                 "Записей".to_string(),
                 st.count.to_string(),
-                "Общее время".to_string(),
+                "Сумма по задачам".to_string(),
                 st.total_label.clone(),
+                "Фактическое время".to_string(),
+                st.actual_label.clone(),
             ]));
             body.push_str("\r\n");
             for (title, items) in stats_sections(st) {
@@ -603,7 +501,8 @@ fn write_stats_body(
                 body.push_str(&row_csv(&[
                     "Имя".to_string(),
                     "Задач".to_string(),
-                    "Общее время".to_string(),
+                    "Сумма по задачам".to_string(),
+                    "Фактическое время".to_string(),
                     "Среднее".to_string(),
                 ]));
                 for item in items {
@@ -611,6 +510,7 @@ fn write_stats_body(
                         item.name.clone(),
                         item.count.to_string(),
                         item.total_label.clone(),
+                        item.actual_label.clone(),
                         item.avg_label.clone(),
                     ]));
                 }
@@ -630,21 +530,22 @@ fn fmt_period(date_from: &str, date_to: &str) -> String {
     format!("{date_from} — {date_to}")
 }
 
-fn report_txt(list: &[&Task], secs: f64, tag_map: &HashMap<String, f64>, date_from: &str, date_to: &str, now: chrono::NaiveDateTime) -> String {
+fn report_txt(list: &[&Task], sums: TimeSums, tag_map: &HashMap<String, TimeSums>, date_from: &str, date_to: &str, now: chrono::NaiveDateTime) -> String {
     let mut lines = Vec::new();
     lines.push("ОТЧЁТ ПО ВРЕМЕНИ".to_string());
     lines.push(format!("Период: {}", fmt_period(date_from, date_to)));
     lines.push("=".repeat(70));
     lines.push(String::new());
     lines.push(format!("Записей: {}", list.len()));
-    lines.push(format!("Общее время: {}", fmt_td(secs)));
+    lines.push(format!("Сумма по задачам: {}", fmt_td(sums.sum)));
+    lines.push(format!("Фактическое время: {}", fmt_td(sums.actual)));
     lines.push(String::new());
-    lines.push("ПО ТЕГАМ:".to_string());
+    lines.push("ПО ТЕГАМ (сумма по задачам / фактическое время):".to_string());
     lines.push("-".repeat(40));
-    let mut tags: Vec<(&String, &f64)> = tag_map.iter().collect();
+    let mut tags: Vec<(&String, &TimeSums)> = tag_map.iter().collect();
     tags.sort_by(|a, b| a.0.cmp(b.0));
     for (name, s) in tags {
-        lines.push(format!("  {:<30} {}", name, fmt_td(*s)));
+        lines.push(format!("  {:<30} {}  /  {}", name, fmt_td(s.sum), fmt_td(s.actual)));
     }
     lines.push(String::new());
     lines.push("ДЕТАЛИЗАЦИЯ:".to_string());
@@ -668,19 +569,20 @@ fn report_txt(list: &[&Task], secs: f64, tag_map: &HashMap<String, f64>, date_fr
     lines.join("\n")
 }
 
-fn report_md(list: &[&Task], secs: f64, tag_map: &HashMap<String, f64>, date_from: &str, date_to: &str) -> String {
+fn report_md(list: &[&Task], sums: TimeSums, tag_map: &HashMap<String, TimeSums>, date_from: &str, date_to: &str) -> String {
     let mut lines = Vec::new();
     lines.push("# Отчёт по времени\n".to_string());
     lines.push(format!("**Период:** {}\n", fmt_period(date_from, date_to)));
     lines.push(format!("**Записей:** {}  ", list.len()));
-    lines.push(format!("**Общее время:** {}\n", fmt_td(secs)));
+    lines.push(format!("**Сумма по задачам:** {}  ", fmt_td(sums.sum)));
+    lines.push(format!("**Фактическое время:** {}\n", fmt_td(sums.actual)));
     lines.push("## По тегам\n".to_string());
-    lines.push("| Тег | Время |".to_string());
-    lines.push("|-----|-------|".to_string());
-    let mut tags: Vec<(&String, &f64)> = tag_map.iter().collect();
+    lines.push("| Тег | Сумма по задачам | Фактическое время |".to_string());
+    lines.push("|-----|------------------|-------------------|".to_string());
+    let mut tags: Vec<(&String, &TimeSums)> = tag_map.iter().collect();
     tags.sort_by(|a, b| a.0.cmp(b.0));
     for (name, s) in tags {
-        lines.push(format!("| {} | {} |", name, fmt_td(*s)));
+        lines.push(format!("| {} | {} | {} |", name, fmt_td(s.sum), fmt_td(s.actual)));
     }
     lines.push(String::new());
     lines.push("## Детализация\n".to_string());
@@ -735,8 +637,8 @@ fn header_format(accent: u32) -> rust_xlsxwriter::Format {
 fn write_report_xlsx(
     path: &Path,
     list: &[&Task],
-    secs: f64,
-    tag_map: &HashMap<String, f64>,
+    sums: TimeSums,
+    tag_map: &HashMap<String, TimeSums>,
     date_from: &str,
     date_to: &str,
     accent_color: &str,
@@ -755,15 +657,19 @@ fn write_report_xlsx(
     ws.write_string(row, 0, fmt_period(date_from, date_to)).map_err(err)?;
     row += 2;
     ws.write_string(row, 0, format!("Записей: {}", list.len())).map_err(err)?;
-    ws.write_string(row, 1, format!("Общее время: {}", fmt_td(secs))).map_err(err)?;
+    ws.write_string(row, 1, format!("Сумма по задачам: {}", fmt_td(sums.sum))).map_err(err)?;
+    ws.write_string(row, 2, format!("Фактическое время: {}", fmt_td(sums.actual))).map_err(err)?;
     row += 2;
     ws.write_string(row, 0, "По тегам:").map_err(err)?;
+    ws.write_string(row, 1, "Сумма по задачам").map_err(err)?;
+    ws.write_string(row, 2, "Фактическое время").map_err(err)?;
     row += 1;
-    let mut tags: Vec<(&String, &f64)> = tag_map.iter().collect();
+    let mut tags: Vec<(&String, &TimeSums)> = tag_map.iter().collect();
     tags.sort_by(|a, b| a.0.cmp(b.0));
     for (name, s) in tags {
         ws.write_string(row, 0, name).map_err(err)?;
-        ws.write_string(row, 1, fmt_td(*s)).map_err(err)?;
+        ws.write_string(row, 1, fmt_td(s.sum)).map_err(err)?;
+        ws.write_string(row, 2, fmt_td(s.actual)).map_err(err)?;
         row += 1;
     }
     row += 1;
@@ -804,7 +710,8 @@ fn stats_txt(st: &Stats, date_from: &str, date_to: &str) -> String {
     lines.push("=".repeat(70));
     lines.push(String::new());
     lines.push(format!("Записей: {}", st.count));
-    lines.push(format!("Общее время: {}", st.total_label));
+    lines.push(format!("Сумма по задачам: {}", st.total_label));
+    lines.push(format!("Фактическое время: {}", st.actual_label));
     lines.push(format!("Среднее время задачи: {}", st.avg_label));
     lines.push(String::new());
     for (title, items) in stats_sections(st) {
@@ -812,11 +719,12 @@ fn stats_txt(st: &Stats, date_from: &str, date_to: &str) -> String {
             continue;
         }
         lines.push(format!("{title}:"));
-        lines.push("-".repeat(55));
+        lines.push("  (сумма по задачам / фактическое время)".to_string());
+        lines.push("-".repeat(70));
         for item in items {
             lines.push(format!(
-                "  {:<25} {:>6} задач {:>12} (ср. {})",
-                item.name, item.count, item.total_label, item.avg_label
+                "  {:<25} {:>6} задач {:>10} / {:<10} (ср. {})",
+                item.name, item.count, item.total_label, item.actual_label, item.avg_label
             ));
         }
         lines.push(String::new());
@@ -829,19 +737,20 @@ fn stats_md(st: &Stats, date_from: &str, date_to: &str) -> String {
     lines.push("# Статистика\n".to_string());
     lines.push(format!("**Период:** {}\n", fmt_period(date_from, date_to)));
     lines.push(format!("**Записей:** {}  ", st.count));
-    lines.push(format!("**Общее время:** {}  ", st.total_label));
+    lines.push(format!("**Сумма по задачам:** {}  ", st.total_label));
+    lines.push(format!("**Фактическое время:** {}  ", st.actual_label));
     lines.push(format!("**Среднее:** {}\n", st.avg_label));
     for (title, items) in stats_sections(st) {
         if items.is_empty() {
             continue;
         }
         lines.push(format!("## {title}\n"));
-        lines.push("| Имя | Задач | Общее время | Среднее |".to_string());
-        lines.push("|-----|-------|-------------|---------|".to_string());
+        lines.push("| Имя | Задач | Сумма по задачам | Фактическое время | Среднее |".to_string());
+        lines.push("|-----|-------|------------------|-------------------|---------|".to_string());
         for item in items {
             lines.push(format!(
-                "| {} | {} | {} | {} |",
-                item.name, item.count, item.total_label, item.avg_label
+                "| {} | {} | {} | {} | {} |",
+                item.name, item.count, item.total_label, item.actual_label, item.avg_label
             ));
         }
         lines.push(String::new());
@@ -863,8 +772,9 @@ fn write_stats_xlsx(path: &Path, st: &Stats, date_from: &str, date_to: &str, acc
     ws.write_string(row, 0, fmt_period(date_from, date_to)).map_err(err)?;
     row += 2;
     ws.write_string(row, 0, format!("Записей: {}", st.count)).map_err(err)?;
-    ws.write_string(row, 1, format!("Общее время: {}", st.total_label)).map_err(err)?;
-    ws.write_string(row, 2, format!("Среднее: {}", st.avg_label)).map_err(err)?;
+    ws.write_string(row, 1, format!("Сумма по задачам: {}", st.total_label)).map_err(err)?;
+    ws.write_string(row, 2, format!("Фактическое время: {}", st.actual_label)).map_err(err)?;
+    ws.write_string(row, 3, format!("Среднее: {}", st.avg_label)).map_err(err)?;
     row += 2;
 
     for (title, items) in stats_sections(st) {
@@ -873,7 +783,7 @@ fn write_stats_xlsx(path: &Path, st: &Stats, date_from: &str, date_to: &str, acc
         }
         ws.write_string(row, 0, title).map_err(err)?;
         row += 1;
-        for (col, h) in ["Имя", "Задач", "Общее время", "Среднее"].iter().enumerate() {
+        for (col, h) in ["Имя", "Задач", "Сумма по задачам", "Фактическое время", "Среднее"].iter().enumerate() {
             ws.write_string_with_format(row, col as u16, *h, &header).map_err(err)?;
         }
         row += 1;
@@ -881,12 +791,13 @@ fn write_stats_xlsx(path: &Path, st: &Stats, date_from: &str, date_to: &str, acc
             ws.write_string(row, 0, &item.name).map_err(err)?;
             ws.write_number(row, 1, item.count as f64).map_err(err)?;
             ws.write_string(row, 2, &item.total_label).map_err(err)?;
-            ws.write_string(row, 3, &item.avg_label).map_err(err)?;
+            ws.write_string(row, 3, &item.actual_label).map_err(err)?;
+            ws.write_string(row, 4, &item.avg_label).map_err(err)?;
             row += 1;
         }
         row += 1;
     }
-    for col in 0..4u16 {
+    for col in 0..5u16 {
         ws.set_column_width(col, 18.0).map_err(err)?;
     }
     wb.save(path).map_err(err)

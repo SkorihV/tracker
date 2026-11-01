@@ -5,6 +5,18 @@ body,
   margin: 0;
 }
 
+/* Экран занимает ровно окно: фильтры и подвал на месте, прокручивается только таблица. */
+.v-application__wrap {
+  height: 100vh;
+  min-height: 0;
+}
+
+.v-application__wrap > .v-main {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .mono {
   font-family: "Cascadia Mono", "Consolas", monospace;
 }
@@ -38,7 +50,32 @@ body,
   overflow-y: auto;
 }
 
+/* Тело окна не прокручивается само: прокручивается только вложенная таблица (шапка остаётся на месте). */
+.modal-card .v-card-text.modal-body--fill {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal-body--fill .stats-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.modal-body--fill .report-table {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.modal-body--fill .report-table > .v-table__wrapper {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
 .modal-card .v-toolbar,
+.modal-card .modal-header,
 .modal-card .v-card-actions {
   flex: 0 0 auto;
 }

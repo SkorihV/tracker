@@ -94,7 +94,7 @@ fn filters_group_and_totals() {
     assert_eq!(totals.count, st.tasks.len());
     assert!(rows.len() >= st.tasks.len());
     let _ = apply_filter(&st.tasks, &f, tracker_core::dt::now_naive());
-    let _ = build_totals(&[]);
+    let _ = build_totals(&[], tracker_core::dt::now_naive());
 
     // search по куску текста должен найти все задачи с этим словом
     let f2 = TaskFilter { search: "тест".into(), ..Default::default() };

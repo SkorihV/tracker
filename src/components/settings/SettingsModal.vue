@@ -27,14 +27,16 @@ async function onAction(kind, payload) {
 
 <template>
   <BaseModal title="Настройки" max-width="800" width="960" height="80vh" @close="emit('close')">
-    <v-tabs v-model="tab" color="primary" class="mb-4">
-      <v-tab value="general">Общее</v-tab>
-      <v-tab value="users">Пользователи</v-tab>
-      <v-tab value="tags">Теги</v-tab>
-      <v-tab value="clients">Клиенты</v-tab>
-      <v-tab value="statuses">Статусы</v-tab>
-      <v-tab value="tasks">Заголовки таблицы</v-tab>
-    </v-tabs>
+    <template #header>
+      <v-tabs v-model="tab" color="primary" class="mb-4">
+        <v-tab value="general">Общее</v-tab>
+        <v-tab value="users">Пользователи</v-tab>
+        <v-tab value="tags">Теги</v-tab>
+        <v-tab value="clients">Клиенты</v-tab>
+        <v-tab value="statuses">Статусы</v-tab>
+        <v-tab value="tasks">Заголовки таблицы</v-tab>
+      </v-tabs>
+    </template>
 
     <div v-if="tab === 'general'">
       <TabGeneral />

@@ -58,8 +58,9 @@ function editTask(task) {
     comment: task.comment,
     customStatus: task.status || "",
     ourCar: task.ourCar || false,
-    start: task.start || "",
-    end: task.end || "",
+    // В окне редактирования — даты текущего (последнего) диапазона; в таблице — первое начало и последнее завершение.
+    start: task.currentStart || task.start || "",
+    end: task.currentEnd || "",
     intervalsCount: task.intervalsCount || 1,
     ranges: task.ranges || [],
   }
@@ -144,30 +145,41 @@ onBeforeUnmount(() => {
   <v-app>
     <header-layout @new-task="newTask" />
 
-    <v-main class="pa-4 d-flex flex-column">
+    <v-main class="px-4 pt-4 pb-1 d-flex flex-column">
       <v-alert
         v-if="appStore.error"
         max-height="100px"
         type="error"
         density="compact"
-        class="mb-3"
+        class="mb-3 flex-shrink-0"
         closable
         @click:close="appStore.error = ''"
       >
         {{ appStore.error }}
       </v-alert>
-      <FilterBar />
+      <FilterBar class="flex-shrink-0" />
 
       <TaskTable v-model:selected-ids="selectedIds" class="flex-grow-1" @edit="editTask" @delete="onDeleteTasks" />
 
-      <div class="d-flex align-center justify-space-between flex-wrap ga-4 pt-3">
+      <div class="d-flex align-center justify-space-between flex-wrap ga-4 pt-1 flex-shrink-0">
         <div class="d-flex align-center ga-3">
           <span class="text-body-2 text-medium-emphasis">
             Задачи: <b>{{ tasksStore.totals.count }}</b>
           </span>
-          <span class="text-body-2 text-medium-emphasis">
-            Общее время: <b class="mono">{{ tasksStore.totals.timeLabel }}</b>
-          </span>
+          <div class="d-flex flex-column">
+            <span
+              class="text-body-2 text-medium-emphasis"
+              title="Время каждой задачи складывается отдельно: параллельные задачи считаются несколько раз"
+            >
+              Сумма по задачам: <b class="mono">{{ tasksStore.totals.timeLabel }}</b>
+            </span>
+            <span
+              class="text-body-2 text-medium-emphasis"
+              title="Время, в которое шла хотя бы одна задача: пересечения считаются один раз"
+            >
+              Фактическое время: <b class="mono">{{ tasksStore.totals.actualLabel }}</b>
+            </span>
+          </div>
           <v-btn variant="tonal" size="small" prepend-icon="systemIcons:iconClock" @click="showReport = true"
             >Отчёт</v-btn
           >

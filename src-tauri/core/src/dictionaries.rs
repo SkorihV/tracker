@@ -232,7 +232,19 @@ impl Store {
                     self.settings.username.clear();
                 }
             }
-            DictKind::Tag => self.tags.retain(|e| Some(e.id) != id),
+            DictKind::Tag => {
+                // Как и статус: удалённый тег снимается со всех задач, иначе он остаётся в отчётах.
+                let removed: Vec<String> = self
+                    .tags
+                    .iter()
+                    .filter(|e| Some(e.id) == id)
+                    .map(|e| e.name.clone())
+                    .collect();
+                self.tags.retain(|e| Some(e.id) != id);
+                for t in self.tasks.iter_mut() {
+                    t.tags.retain(|tag| !removed.contains(tag));
+                }
+            }
             DictKind::Client => self.clients.retain(|e| Some(e.id) != id),
             DictKind::Status => {
                 let removed: Vec<String> = self
@@ -256,7 +268,12 @@ impl Store {
                 self.users.clear();
                 self.settings.username.clear();
             }
-            DictKind::Tag => self.tags.clear(),
+            DictKind::Tag => {
+                self.tags.clear();
+                for t in self.tasks.iter_mut() {
+                    t.tags.clear();
+                }
+            }
             DictKind::Client => self.clients.clear(),
             DictKind::Status => {
                 self.statuses.clear();
