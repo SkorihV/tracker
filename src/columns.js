@@ -1,12 +1,17 @@
-/** Описание колонок таблицы задач и слияние с порядком/видимостью из настроек. */
+/**
+ * Описание колонок таблицы задач и слияние с порядком/видимостью из настроек.
+ * Ширина колонок с «тяжёлыми» ячейками (статус, действия, режим, наша машина) задана явно:
+ * иначе при поиске без совпадений или без таких значений таблица пересчитывает их по
+ * содержимому и колонки схлопываются.
+ */
 
 export function defaultColumns() {
   return [
     { key: "time", label: "Время", visible: true, width: "100px" },
-    { key: "status", label: "Статус", visible: true, width: "" },
-    { key: "ourCar", label: "Наша машина", visible: true, width: "" },
-    { key: "actions", label: "Действия", visible: true, width: "" },
-    { key: "mode", label: "Режим", visible: true, width: "" },
+    { key: "status", label: "Статус", visible: true, width: "182px", minWidth: 182 },
+    { key: "ourCar", label: "Наша машина", visible: true, width: "92px", minWidth: 92 },
+    { key: "actions", label: "Действия", visible: true, width: "142px", minWidth: 142 },
+    { key: "mode", label: "Режим", visible: true, width: "155px", minWidth: 155 },
     { key: "order", label: "Заявка", visible: true, width: "500px" },
     { key: "client", label: "Клиент", visible: true, width: "" },
     { key: "tags", label: "Тег", visible: true, width: "" },
